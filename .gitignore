@@ -1,0 +1,4 @@
+.clangd
+build
+reference
+*.synctex.gz
