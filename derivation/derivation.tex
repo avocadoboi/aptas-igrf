@@ -1,6 +1,6 @@
 \documentclass[12pt]{article}
 
-\usepackage{stil}
+\usepackage{packages}
 
 \begin{document}
 
@@ -18,14 +18,13 @@
 
   \tikzmath{\n{end} = int(\N - 1); }
   \foreach \m in {0, 1} {
-    \pgfmathtruncatemacro{\nstart}{\m+1}
-    \foreach \n in {\nstart, ..., \n{end}} {
+    \foreach \n in {2, ..., \n{end}} {
       \pgfmathtruncatemacro{\next}{\n+1}
       \draw[->] (P\n\m) -- (P\next\m);
     }
   }
 
-  \foreach \n in {2, ..., \N} {
+  \foreach \n in {3, ..., \N} {
     \foreach \m in {2, ..., \n} {
       \pgfmathtruncatemacro{\previous}{\m-1}
       \draw[->] (P\n\previous) -- (P\n\m);
@@ -37,9 +36,11 @@ The $n$th degree, $m$th order associated legendre function is defined as
 \begin{equation}
   P_n^m(\mu) = \alpha_n^mD^{m+n}(\mu^2-1)^n
 \end{equation}
+where
 \begin{equation}
   \alpha_n^m = \sqrt{(2-\delta_{m0})\frac{(n-m)!}{(n+m)!}}\frac{1}{2^nn!}(1-\mu^2)^{m/2}
 \end{equation}
+
 % \begin{equation}
 %   P_n^m(\mu) = \frac{2n-1}{(n^2 - m^2)^{1/2}}\mu P_{n-1}^m(\mu) - \left(\frac{(n-1)^2 - m^2}{n^2 - m^2}\right)^{1/2}P_{n-2}^m(\mu)
 % \end{equation}

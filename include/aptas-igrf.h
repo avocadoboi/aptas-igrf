@@ -17,12 +17,12 @@ typedef enum {
 } IGRFError;
 
 typedef struct {
-  float east;
-  float north;
-  float up;
+  double east;
+  double north;
+  double up;
 } magnetic_field_vector_t;
 
-static float const igrf_earth_radius = 6371.2; // [km]
+static double const igrf_earth_radius = 6371.2; // [km]
 
 /**
  * Reads Schmidt quasi-normal internal spherical harmonic coefficients from a specified IGRF model file into an array
@@ -35,7 +35,7 @@ static float const igrf_earth_radius = 6371.2; // [km]
 IGRFError load_IGRF_coefficients(char const* file_name);
 
 
-// void extrapolate_IGRF_coefficients(float year);
+// void extrapolate_IGRF_coefficients(double year);
 
 /**
  * Calculates the geomagnetic field at an ECEF point based on the IGRF model.
@@ -45,6 +45,6 @@ IGRFError load_IGRF_coefficients(char const* file_name);
  * \return Geomagnetic field vector where x is eastward, y is northward, and z is vertically upwards from Earth.
  * \note load_IGRF_coefficients must be called before trying to use this function.
  */
-magnetic_field_vector_t calculate_model_geomagnetic_field(float latitude, float longitude, float altitude, float decimal_year);
+magnetic_field_vector_t calculate_model_geomagnetic_field(double latitude, double longitude, double altitude, double decimal_year);
 
 #endif
