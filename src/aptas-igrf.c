@@ -7,6 +7,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef CPP_ASSOC_LEGENDRE_TESTING
+#include <array>
+#include <cmath>
+#endif
+
 #define MAX_HARMONIC_DEGREE 13
 
 #define G_COEFFICIENT_COUNT MAX_HARMONIC_DEGREE*(MAX_HARMONIC_DEGREE + 3)/2
@@ -23,10 +28,10 @@ IGRFError load_IGRF_coefficients(char const* const file_name) {
   if (file == NULL) {
     return IGRFError_FileNotFound;
   }
-  int g_index = 0;
-  int h_index = 0;
-  for (int n = 1; n <= MAX_HARMONIC_DEGREE; ++n) {
-    for (int m = 0; m <= n; ++m) {
+  unsigned g_index = 0;
+  unsigned h_index = 0;
+  for (unsigned n = 1; n <= MAX_HARMONIC_DEGREE; ++n) {
+    for (unsigned m = 0; m <= n; ++m) {
       if (fscanf(file, "%f%f", g_coefficients + g_index, g_coefficients_rate + g_index) != 2) {
         fclose(file);
         return IGRFError_UnexpectedFileFormat;
@@ -76,8 +81,9 @@ static void init_associated_legendre_state(associated_legendre_state_t* const le
     // 1                              2
     cos_theta,                        sin_theta,
     // 3                              4                           5
-    0.5f*(3*cos_theta*cos_theta - 1), sqrt_3*cos_theta*sin_theta, 0.5f*sqrt_3*sin_theta*sin_theta
+    0.5f*(3*cos_theta*cos_theta - 1), (float)sqrt_3*cos_theta*sin_theta, 0.5f*(float)sqrt_3*sin_theta*sin_theta
   }, sizeof(legendre_state->P_nm_initial));
+  printf("g_index = 4: %.3g   g_index = 5: %.3g\n", legendre_state->P_nm_initial[4], legendre_state->P_nm_initial[5]);
 
   memcpy(legendre_state->P_nm_derivative_initial, (float[1+2+3]){
     // 0
@@ -85,7 +91,7 @@ static void init_associated_legendre_state(associated_legendre_state_t* const le
     // 1                    2
     -sin_theta,             cos_theta,
     // 3                    4                                                   5
-    -3*cos_theta*sin_theta, sqrt_3*(cos_theta*cos_theta - sin_theta*sin_theta), sqrt_3*sin_theta*cos_theta
+    -3*cos_theta*sin_theta, (float)sqrt_3*(cos_theta*cos_theta - sin_theta*sin_theta), (float)sqrt_3*sin_theta*cos_theta
   }, sizeof(legendre_state->P_nm_derivative_initial));
 
   // P_left and P_left_derivative will be filled in later once we have P_4_0 and P_4_1.
@@ -109,13 +115,13 @@ static void init_associated_legendre_state(associated_legendre_state_t* const le
  * m must be either 0 or 1 since we only propagate down in the first two columns.
  */
 static void associated_legendre_propagate_down(
-  int const n, int const m, 
+  unsigned const n, unsigned const m, 
   associated_legendre_state_t* const legendre, 
   float const cos_theta, float const sin_theta
 ) {
   assert(m == 0 || m == 1);
-  float const A = (float)(2*n - 1)/sqrtf((float)(n^2 - m^2));
-  float const B = sqrtf((float)((n - 1)^2 - m)/(float)(n^2 - m^2));
+  float const A = (float)(2*n - 1)/sqrtf((float)(n*n - m*m));
+  float const B = sqrtf((float)((n - 1)*(n - 1) - m)/(float)(n*n - m*m));
   
   float const P_nm = A*cos_theta*legendre->P_up[m][0] - B*legendre->P_up[m][1];
   float const P_nm_derivative = A*(cos_theta*legendre->P_up_derivative[m][0] - sin_theta*legendre->P_up[m][0]) - B*legendre->P_up_derivative[m][1];
@@ -127,15 +133,17 @@ static void associated_legendre_propagate_down(
   legendre->P_up_derivative[m][0] = P_nm_derivative;
 }
 static void associated_legendre_propagate_right(
-  int const n, int const m, 
+  unsigned const n, unsigned const m, 
   associated_legendre_state_t* const legendre, 
   float const cos_theta, float const sin_theta
 ) {
   float const C = 2.f*(float)(m - 1)/sqrtf((float)((n - m + 1)*(n + m)));
-  float const D = sqrtf((float)((n - m + 2)*(n + m - 1))/(float)((n + m)*(n - m + 1)));
+  float const D = sqrtf((m == 2 ? 2 : 1)*(float)((n - m + 2)*(n + m - 1))/(float)((n + m)*(n - m + 1)));
 
   float const P_nm = C*cos_theta/sin_theta*legendre->P_left[0] - D*legendre->P_left[1];
   float const P_nm_derivative = C/sin_theta*(cos_theta*legendre->P_left_derivative[0] - legendre->P_left[0]) - D*legendre->P_left_derivative[1];
+  // printf("\nC: %.3g\t D: %.3g", C, D);
+  // printf("\nP_%u^%u: %.3g\tP_%u^%u: %.3g\tP_%u^%u: %.3g\n", n, m - 1, legendre->P_left[0], n, m - 2, legendre->P_left[1], n, m, P_nm);
 
   legendre->P_left[1] = legendre->P_left[0];
   legendre->P_left[0] = P_nm;
@@ -150,7 +158,7 @@ typedef struct {
 } associated_legendre_pair_t;
 
 static associated_legendre_pair_t next_associated_legendre(
-  int const n, int const m, int const g_index, 
+  unsigned const n, unsigned const m, unsigned const g_index, 
   associated_legendre_state_t* const legendre_state, 
   float const cos_theta, float const sin_theta
 ) {
@@ -174,6 +182,10 @@ static associated_legendre_pair_t next_associated_legendre(
     }
   }
   else {
+    // If we want to use less memory we could have a switch statement over n with switch statements over m 
+    // inside each case and calculating the values here instead of having the arrays P_nm_initial and P_nm_derivative_initial.
+    // Then we would fill in P_up and P_up_derivative here also. 
+
     assert(g_index < sizeof(legendre_state->P_nm_initial)/sizeof(legendre_state->P_nm_initial[0]));
     // The array of 'initial' (as in those that the recurrence relations start from) 
     // associated legendre functions are indexed the same as the g_n_m coefficients.
@@ -195,11 +207,20 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(float const latitude, 
   init_associated_legendre_state(&legendre_state, cos_theta, sin_theta);
 
   magnetic_field_vector_t field = {0};
-  int g_index = 0;
-  int h_index = 0;
-  for (int n = 1; n <= MAX_HARMONIC_DEGREE; ++n) {
+  unsigned g_index = 0;
+  unsigned h_index = 0;
+  for (unsigned n = 0; n <= MAX_HARMONIC_DEGREE; ++n) {
     float const north_factor = 1/r*igrf_earth_radius*powf(igrf_earth_radius/r, (float)(n + 1));
-    for (int m = 0; m <= n; ++m) {
+    for (unsigned m = 0; m <= n; ++m) {
+      associated_legendre_pair_t const new_legendre = next_associated_legendre(n, m, g_index, &legendre_state, cos_theta, sin_theta);
+      printf("n = %u m = %u g_index = %u Calculated: %.5g\n", n, m, g_index, new_legendre.P_nm);
+
+      // Convenient testing using the C++ std::assoc_legendre function.
+      #ifdef CPP_ASSOC_LEGENDRE_TESTING
+      float const correct = std::assoc_legendre(n, m, cos_theta)*std::sqrt((m == 0 ? 1 : 2)*static_cast<float>(std::tgamma(n - m + 1))/static_cast<float>(std::tgamma(n + m + 1)));
+      printf("n = %u m = %u g_index = %u Calculated: %.5g\t Correct: %.5g\n", n, m, g_index, new_legendre.P_nm, correct);
+      #endif
+
       float const g_nm = g_coefficients[g_index] + (decimal_year - 2025.f)*g_coefficients_rate[g_index];
       ++g_index;
 
@@ -209,8 +230,7 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(float const latitude, 
         ++h_index;
       }
 
-      associated_legendre_pair_t const new_legendre = next_associated_legendre(n, m, g_index, &legendre_state, cos_theta, sin_theta);
-      
+
     }
   }
   

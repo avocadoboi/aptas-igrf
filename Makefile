@@ -1,9 +1,12 @@
-COMPILER_FLAGS := -std=c99 -Werror -Wall -Wextra -Iinclude 
+COMPILER_FLAGS := -std=c99 -Wall -Wextra -Iinclude
+# COMPILER_FLAGS := -std=c++23 -Wall -Wextra -Iinclude 
+CC := gcc
 
 build/test: build/aptas-igrf.o test/test.c | build
-	gcc $(COMPILER_FLAGS) -o build/test test/test.c build/aptas-igrf.o
+	$(CC) $(COMPILER_FLAGS) -o $@ test/test.c build/aptas-igrf.o -lm
 build/aptas-igrf.o: include/aptas-igrf.h src/aptas-igrf.c | build
-	gcc $(COMPILER_FLAGS) -c -o build/aptas-igrf.o src/aptas-igrf.c
+	$(CC) $(COMPILER_FLAGS) -c -o $@ src/aptas-igrf.c
 build:
 	mkdir build
-
+clean:
+	rm -r build

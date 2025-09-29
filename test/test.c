@@ -23,4 +23,6 @@ void load_coefficients(void) {
 
 int main(void) {
   load_coefficients();
+
+  calculate_model_geomagnetic_field(27.f, 0, 0, 2025.5f);
 }
