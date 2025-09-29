@@ -12,11 +12,11 @@
 
 static float g_coefficients[G_COEFFICIENT_COUNT];
 static float g_coefficients_rate[G_COEFFICIENT_COUNT];
-static float extrapolated_g_coefficients[G_COEFFICIENT_COUNT];
+// static float extrapolated_g_coefficients[G_COEFFICIENT_COUNT];
 
 static float h_coefficients[H_COEFFICIENT_COUNT];
 static float h_coefficients_rate[H_COEFFICIENT_COUNT];
-static float extrapolated_h_coefficients[H_COEFFICIENT_COUNT];
+// static float extrapolated_h_coefficients[H_COEFFICIENT_COUNT];
 
 IGRFError load_IGRF_coefficients(char const* const file_name) {
   FILE* const file = fopen(file_name, "rt");
@@ -73,28 +73,81 @@ static float associated_legendre_propagate_down(int const n, int const m, float 
   return A*cos_theta*P_n1_m - B*P_n2_m;
 }
 
+typedef struct {
+  /*
+  {
+    { P_{n-1}^0, P_{n-2}^0 },
+    { P_{n-1}^1, P_{n-2}^1 },
+  }
+  */
+  float P_up[2][2];
+  // Derivative of the legendre functions above, with respect to mu = cos(theta).
+  float P_up_derivative[2][2];
+  /*
+  { P_n^{m-1}, P_n^{m-2} }
+  */
+  float P_left[2];
+  float P_left_derivative[2];
+} associated_legendre_state_t;
+
 magnetic_field_vector_t calculate_model_geomagnetic_field(float const latitude, float const longitude, float const altitude, float const decimal_year) {
-  magnetic_field_vector_t field = {0};
   float const cos_theta = cosf((90.f - latitude)*deg_to_rad);
   float const sin_theta = sqrtf(1 - cos_theta*cos_theta);
   float const r = igrf_earth_radius + altitude;
 
+  // Starting values for the recursive formulas for the associated legendre functions.
   float const P_0_0 = 1;
+  float const P_0_0_d = 0;
+
   float const P_1_0 = cos_theta;
+  float const P_1_0_d = -sin_theta;
+
   float const P_1_1 = sin_theta;
+  // sqrt(1 - m^2)
+  // 1/(2sqrt(1-m^2))*(-2m) = -1/tan(theta)
+  float const P_1_1_d = cos_theta;
+
   float const P_2_1 = sqrt_3*cos_theta*sin_theta;
-  // float P_n1_m = 
+  float const P_2_1_d = sqrt_3*(cos_theta*cos_theta - sin_theta*sin_theta);
+
+  magnetic_field_vector_t field = {0};
+  associated_legendre_state_t legendre = {
+    .P_up = {
+      { P_1_0, P_0_0 },
+      { P_2_1, P_1_1 }
+    },
+    .P_up_derivative = {
+      { P_1_0_d, P_0_0_d },
+      { P_2_1_d, P_1_1_d }
+    },
+    .P_left = {
+      P_2_1, 0 // P_
+    }
+  };
 
   int g_index = 0;
   int h_index = 0;
   for (int n = 1; n <= MAX_HARMONIC_DEGREE; ++n) {
+    float const north_factor = 1/r*igrf_earth_radius*powf(igrf_earth_radius/r, (float)(n + 1));
     for (int m = 0; m <= n; ++m) {
       float const g_nm = g_coefficients[g_index] + (decimal_year - 2025.f)*g_coefficients_rate[g_index];
       ++g_index;
 
-      field.north = 1/r*igrf_earth_radius;
+      float const h_nm 
+      float P_n_m = 0;
+      if (m == 0) {
+        if ()
+        P_n_m = associated_legendre_propagate_down(n, m, P_n1_0, P_n2_0, cos_theta);
+        P_n1_0 = P_n2_0;
+        P_n2_0 = P_n_m;
+      }
+      if (m == )
+      // field.north += north_factor;
+      float sin_term = 0.f;
+
       if (m != 0) {
         float const h_nm = h_coefficients[h_index] + (decimal_year - 2025.f)*h_coefficients_rate[h_index];
+        sin_term = h_nm * sinf
         ++h_index;
       }
     }

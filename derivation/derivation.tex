@@ -4,8 +4,34 @@
 
 \begin{document}
 
-\begin{equation}
-\end{equation}
+% \begin{equation}
+% \end{equation}
+
+\begin{tikzpicture}
+  \tikzmath{\N = 5;}
+
+  \foreach \n in {0, ..., \N} {
+    \foreach \m in {0, ..., \n} {
+      \node (P\n\m) at (\m, -\n) {$P_{\n}^{\m}$};
+    }
+  }
+
+  \tikzmath{\n{end} = int(\N - 1); }
+  \foreach \m in {0, 1} {
+    \pgfmathtruncatemacro{\nstart}{\m+1}
+    \foreach \n in {\nstart, ..., \n{end}} {
+      \pgfmathtruncatemacro{\next}{\n+1}
+      \draw[->] (P\n\m) -- (P\next\m);
+    }
+  }
+
+  \foreach \n in {2, ..., \N} {
+    \foreach \m in {2, ..., \n} {
+      \pgfmathtruncatemacro{\previous}{\m-1}
+      \draw[->] (P\n\previous) -- (P\n\m);
+    }
+  }
+\end{tikzpicture}
 
 The $n$th degree, $m$th order associated legendre function is defined as
 \begin{equation}
