@@ -2,8 +2,10 @@
 
 #include "math_constants.h"
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #define MAX_HARMONIC_DEGREE 13
 
@@ -12,11 +14,9 @@
 
 static float g_coefficients[G_COEFFICIENT_COUNT];
 static float g_coefficients_rate[G_COEFFICIENT_COUNT];
-// static float extrapolated_g_coefficients[G_COEFFICIENT_COUNT];
 
 static float h_coefficients[H_COEFFICIENT_COUNT];
 static float h_coefficients_rate[H_COEFFICIENT_COUNT];
-// static float extrapolated_h_coefficients[H_COEFFICIENT_COUNT];
 
 IGRFError load_IGRF_coefficients(char const* const file_name) {
   FILE* const file = fopen(file_name, "rt");
@@ -46,34 +46,10 @@ IGRFError load_IGRF_coefficients(char const* const file_name) {
   return IGRFError_Success;
 }
 
-
-// void extrapolate_IGRF_coefficients(float const year) {
-//   int g_index = 0;
-//   int h_index = 0;
-//   for (int n = 1; n <= MAX_HARMONIC_DEGREE; ++n) {
-//     for (int m = 0; m <= n; ++m) {
-//       extrapolated_g_coefficients[g_index] = g_coefficients[g_index] + (year - 2025.f)*g_coefficients_rate[g_index];
-//       ++g_index;
-//       if (m != 0) {
-//         extrapolated_h_coefficients[h_index] = h_coefficients[h_index] + (year - 2025.f)*h_coefficients_rate[h_index];
-//         ++h_index;
-//       }
-//     }
-//   }
-// }
-
-static float associated_legendre_propagate_right(int const n, int const m, float const P_n_m1, float const P_n_m2, float const cos_theta, float const sin_theta) {
-  float const A = 2.f*(float)(m - 1)/sqrtf((float)((n - m + 1)*(n + m)));
-  float const B = sqrtf((float)((n - m + 2)*(n + m - 1))/(float)((n + m)*(n - m + 1)));
-  return A*cos_theta/sin_theta*P_n_m1 - B*P_n_m2;
-}
-static float associated_legendre_propagate_down(int const n, int const m, float const P_n1_m, float const P_n2_m, float const cos_theta) {
-  float const A = (float)(2*n - 1)/sqrtf((float)(n^2 - m^2));
-  float const B = sqrtf((float)((n - 1)^2 - m)/(float)(n^2 - m^2));
-  return A*cos_theta*P_n1_m - B*P_n2_m;
-}
-
 typedef struct {
+  // Starting values for the recursive formulas for the associated legendre functions.
+  float P_nm_initial[1+2+3];
+  float P_nm_derivative_initial[1+2+3];
   /*
   {
     { P_{n-1}^0, P_{n-2}^0 },
@@ -90,41 +66,135 @@ typedef struct {
   float P_left_derivative[2];
 } associated_legendre_state_t;
 
+static void init_associated_legendre_state(associated_legendre_state_t* const legendre_state, float const cos_theta, float const sin_theta) {
+  // Initialize the associated legendre state struct, containing the initial values that the recurrence relations
+  // start from as well as arrays containing P_n^{m-1} and P_n^{m-2} (P_left) that are updated for each recurrence step
+  // and similarly for the downward propagation in the two leftmost columns (m = 0 and m = 1).
+  memcpy(legendre_state->P_nm_initial, (float[1+2+3]){
+    // 0
+    1,
+    // 1                              2
+    cos_theta,                        sin_theta,
+    // 3                              4                           5
+    0.5f*(3*cos_theta*cos_theta - 1), sqrt_3*cos_theta*sin_theta, 0.5f*sqrt_3*sin_theta*sin_theta
+  }, sizeof(legendre_state->P_nm_initial));
+
+  memcpy(legendre_state->P_nm_derivative_initial, (float[1+2+3]){
+    // 0
+    0,
+    // 1                    2
+    -sin_theta,             cos_theta,
+    // 3                    4                                                   5
+    -3*cos_theta*sin_theta, sqrt_3*(cos_theta*cos_theta - sin_theta*sin_theta), sqrt_3*sin_theta*cos_theta
+  }, sizeof(legendre_state->P_nm_derivative_initial));
+
+  // P_left and P_left_derivative will be filled in later once we have P_4_0 and P_4_1.
+  // We leave it uninitialized until then.
+
+  // legendre.P_up and legendre.P_up_derivative depend on P_nm_initial and P_nm_derivative_initial so they need to be filled in after.
+  // n = 3 is the first row that uses the recurrence relation to calculate the associated legendre functions.
+  memcpy(legendre_state->P_up, (float[2][2]){
+    // P_2^0                    P_1^0
+    { legendre_state->P_nm_initial[3], legendre_state->P_nm_initial[1] },
+    // P_2^1                    P_1^1
+    { legendre_state->P_nm_initial[4], legendre_state->P_nm_initial[2] }
+  }, sizeof(legendre_state->P_up));
+
+  memcpy(legendre_state->P_up_derivative, (float[2][2]){
+    { legendre_state->P_nm_derivative_initial[3], legendre_state->P_nm_derivative_initial[1] },
+    { legendre_state->P_nm_derivative_initial[4], legendre_state->P_nm_derivative_initial[2] }
+  }, sizeof(legendre_state->P_up_derivative));
+}
+/*
+ * m must be either 0 or 1 since we only propagate down in the first two columns.
+ */
+static void associated_legendre_propagate_down(
+  int const n, int const m, 
+  associated_legendre_state_t* const legendre, 
+  float const cos_theta, float const sin_theta
+) {
+  assert(m == 0 || m == 1);
+  float const A = (float)(2*n - 1)/sqrtf((float)(n^2 - m^2));
+  float const B = sqrtf((float)((n - 1)^2 - m)/(float)(n^2 - m^2));
+  
+  float const P_nm = A*cos_theta*legendre->P_up[m][0] - B*legendre->P_up[m][1];
+  float const P_nm_derivative = A*(cos_theta*legendre->P_up_derivative[m][0] - sin_theta*legendre->P_up[m][0]) - B*legendre->P_up_derivative[m][1];
+
+  legendre->P_up[m][1] = legendre->P_up[m][0];
+  legendre->P_up[m][0] = P_nm;
+
+  legendre->P_up_derivative[m][1] = legendre->P_up_derivative[m][0];
+  legendre->P_up_derivative[m][0] = P_nm_derivative;
+}
+static void associated_legendre_propagate_right(
+  int const n, int const m, 
+  associated_legendre_state_t* const legendre, 
+  float const cos_theta, float const sin_theta
+) {
+  float const C = 2.f*(float)(m - 1)/sqrtf((float)((n - m + 1)*(n + m)));
+  float const D = sqrtf((float)((n - m + 2)*(n + m - 1))/(float)((n + m)*(n - m + 1)));
+
+  float const P_nm = C*cos_theta/sin_theta*legendre->P_left[0] - D*legendre->P_left[1];
+  float const P_nm_derivative = C/sin_theta*(cos_theta*legendre->P_left_derivative[0] - legendre->P_left[0]) - D*legendre->P_left_derivative[1];
+
+  legendre->P_left[1] = legendre->P_left[0];
+  legendre->P_left[0] = P_nm;
+
+  legendre->P_left_derivative[1] = legendre->P_left_derivative[0];
+  legendre->P_left_derivative[0] = P_nm_derivative;
+}
+
+typedef struct {
+  float P_nm;
+  float P_nm_derivative;
+} associated_legendre_pair_t;
+
+static associated_legendre_pair_t next_associated_legendre(
+  int const n, int const m, int const g_index, 
+  associated_legendre_state_t* const legendre_state, 
+  float const cos_theta, float const sin_theta
+) {
+  // If this is true then we use recurrence relations to calculate P_n^m. 
+  // Otherwise we use legendre_state->P_nm_initial. (similarly for the derivatives)
+  if (n >= 3) {
+    if (m == 0 || m == 1) {
+      associated_legendre_propagate_down(n, m, legendre_state, cos_theta, sin_theta);
+      legendre_state->P_left[1 - m] = legendre_state->P_up[m][0];
+      return (associated_legendre_pair_t){
+        .P_nm = legendre_state->P_up[m][0],
+        .P_nm_derivative = legendre_state->P_up_derivative[m][0]
+      };
+    }
+    else {
+      associated_legendre_propagate_right(n, m, legendre_state, cos_theta, sin_theta);
+      return (associated_legendre_pair_t){
+        .P_nm = legendre_state->P_left[0],
+        .P_nm_derivative = legendre_state->P_left_derivative[0]
+      };
+    }
+  }
+  else {
+    assert(g_index < sizeof(legendre_state->P_nm_initial)/sizeof(legendre_state->P_nm_initial[0]));
+    // The array of 'initial' (as in those that the recurrence relations start from) 
+    // associated legendre functions are indexed the same as the g_n_m coefficients.
+    return (associated_legendre_pair_t){
+      .P_nm = legendre_state->P_nm_initial[g_index],
+      .P_nm_derivative = legendre_state->P_nm_derivative_initial[g_index]
+    };
+  }
+}
+
 magnetic_field_vector_t calculate_model_geomagnetic_field(float const latitude, float const longitude, float const altitude, float const decimal_year) {
+  // theta is the co-latitude.
   float const cos_theta = cosf((90.f - latitude)*deg_to_rad);
   float const sin_theta = sqrtf(1 - cos_theta*cos_theta);
   float const r = igrf_earth_radius + altitude;
 
-  // Starting values for the recursive formulas for the associated legendre functions.
-  float const P_0_0 = 1;
-  float const P_0_0_d = 0;
-
-  float const P_1_0 = cos_theta;
-  float const P_1_0_d = -sin_theta;
-
-  float const P_1_1 = sin_theta;
-  // sqrt(1 - m^2)
-  // 1/(2sqrt(1-m^2))*(-2m) = -1/tan(theta)
-  float const P_1_1_d = cos_theta;
-
-  float const P_2_1 = sqrt_3*cos_theta*sin_theta;
-  float const P_2_1_d = sqrt_3*(cos_theta*cos_theta - sin_theta*sin_theta);
+  // Initialize everything except for the P_nm_left and P_nm_left_derivative, those need to be filled in once we have propagated down for the first time.
+  associated_legendre_state_t legendre_state;
+  init_associated_legendre_state(&legendre_state, cos_theta, sin_theta);
 
   magnetic_field_vector_t field = {0};
-  associated_legendre_state_t legendre = {
-    .P_up = {
-      { P_1_0, P_0_0 },
-      { P_2_1, P_1_1 }
-    },
-    .P_up_derivative = {
-      { P_1_0_d, P_0_0_d },
-      { P_2_1_d, P_1_1_d }
-    },
-    .P_left = {
-      P_2_1, 0 // P_
-    }
-  };
-
   int g_index = 0;
   int h_index = 0;
   for (int n = 1; n <= MAX_HARMONIC_DEGREE; ++n) {
@@ -133,270 +203,17 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(float const latitude, 
       float const g_nm = g_coefficients[g_index] + (decimal_year - 2025.f)*g_coefficients_rate[g_index];
       ++g_index;
 
-      float const h_nm 
-      float P_n_m = 0;
-      if (m == 0) {
-        if ()
-        P_n_m = associated_legendre_propagate_down(n, m, P_n1_0, P_n2_0, cos_theta);
-        P_n1_0 = P_n2_0;
-        P_n2_0 = P_n_m;
-      }
-      if (m == )
-      // field.north += north_factor;
-      float sin_term = 0.f;
-
+      float h_nm = 0.f;
       if (m != 0) {
-        float const h_nm = h_coefficients[h_index] + (decimal_year - 2025.f)*h_coefficients_rate[h_index];
-        sin_term = h_nm * sinf
+        h_nm = h_coefficients[h_index] + (decimal_year - 2025.f)*h_coefficients_rate[h_index];
         ++h_index;
       }
+
+      associated_legendre_pair_t const new_legendre = next_associated_legendre(n, m, g_index, &legendre_state, cos_theta, sin_theta);
+      
     }
   }
   
   return field;
 }
 
-
-// enum IGRFError load_IGRF_coefficients(char const* const file_name, double const extrapolated_year) {
-//   FILE* const stream = fopen(file_name, "rt");
-//   if (stream == NULL) {
-//     return IGRFError_FileNotFound;
-//   }
-//   else {
-//     int ii = 0;
-    // fseek(stream, strec, SEEK_SET);
-    // for (int nn = 1; nn <= MAX_HARMONIC_DEGREE; ++nn) {
-      // for (int mm = 0; mm <= nn; ++mm) {
-        // char in_buffer[buffer_size];
-        // int m, n;
-
-        // char irat[9];
-        // int line_num;
-        // double trash;
-        // double g, hh;
-        // if (iflag == 1) {
-        //   fgets(in_buffer, MAXREAD, stream);
-        //   sscanf(in_buffer, "%d%d%lg%lg%lg%lg%s%d",
-        //           &n, &m, &g, &hh, &trash, &trash, irat, &line_num);
-        // }
-        // else {
-        //   fgets(in_buffer, MAXREAD, stream);
-        //   sscanf(in_buffer, "%d%d%lg%lg%lg%lg%s%d",
-        //           &n, &m, &trash, &trash, &g, &hh, irat, &line_num);
-        // }
-        // if ((nn != n) || (mm != m)) {
-        //   ios = -2;
-        //   fclose(stream);
-        //   return(ios);
-        // }
-        // ii = ii + 1;
-        // switch(gh) {
-        //   case 1:  gh1[ii] = g;
-        //     break;
-        //   case 2:  gh2[ii] = g;
-        //     break;
-        //   default: printf("\nError in subroutine getshc");
-        //     break;
-        // }
-        // if (m != 0) {
-        //     ii = ii+ 1;
-        //     switch(gh) {
-        //       case 1:  gh1[ii] = hh;
-        //         break;
-        //       case 2:  gh2[ii] = hh;
-        //         break;
-        //       default: printf("\nError in subroutine getshc");
-        //         break;
-        //     }
-        // }
-  //     }
-  //   }
-  // }
-  // fclose(stream);
-  // return(ios);
-// }
-
-// vec3_t calculate_model_geomagnetic_field(float latitude, float longitude, float altitude) {
-//   double const earths_radius = 6371.2;
-//   double bb, cc, dd;
-//   double sd;
-//   double cd;
-//   double rr;
-//   double fm,fn;
-//   double sl[14];
-//   double cl[14];
-//   double p[119];
-//   double q[119];
-//   int ii,j,k,l,m,n;
-//   int npq;
-//   double argument;
-//   double power;
-//   double const a2 = 40680631.59;            /* WGS84 */
-//   double const b2 = 40408299.98;            /* WGS84 */
-//   argument = latitude * deg_to_rad;
-//   double slat = sin(argument);
-//
-//   double aa;
-//   if (90. - latitude < 0.001) {
-//     aa = 89.999; //  300 ft. from North pole 
-//   }
-//   else if (90. + latitude < 0.001) {
-//     aa = -89.999; //  300 ft. from South pole 
-//   }
-//   else {
-//     aa = latitude;
-//   }
-//
-//   argument = aa * deg_to_rad;
-//   double clat = cos(argument);
-//   argument = longitude * deg_to_rad;
-//   sl[1] = sin(argument);
-//   cl[1] = cos(argument);
-//   switch(gh) {
-//     case 3:  x = 0;
-//       y = 0;
-//       z = 0;
-//       break;
-//     case 4:  xtemp = 0;
-//       ytemp = 0;
-//       ztemp = 0;
-//       break;
-//     default: printf("\nError in subroutine shval3");
-//       break;
-//   }
-//   sd = 0.0;
-//   cd = 1.0;
-//   l = 1;
-//   n = 0;
-//   m = 1;
-//   npq = (nmax * (nmax + 3)) / 2;
-//   double ratio = earths_radius / altitude;
-//   argument = 3.0;
-//   aa = sqrt(argument);
-//   p[1] = 2. * slat;
-//   p[2] = 2. * clat;
-//   p[3] = 4.5 * slat * slat - 1.5;
-//   p[4] = 3. * aa * clat * slat;
-//   q[1] = -clat;
-//   q[2] = slat;
-//   q[3] = -3. * clat * slat;
-//   q[4] = aa * (slat * slat - clat * clat);
-//   for (k = 1; k <= npq; ++k) {
-//       if (n < m) {
-//           m = 0;
-//           n = n + 1;
-//           argument = ratio;
-//           power =  n + 2;
-//           rr = pow(argument,power);
-//           fn = n;
-//       }
-//       fm = m;
-//       if (k >= 5) {
-//           if (m == n) {
-//               argument = (1. - 0.5/fm);
-//               aa = sqrt(argument);
-//               j = k - n - 1;
-//               p[k] = (1. + 1.0/fm) * aa * clat * p[j];
-//               q[k] = aa * (clat * q[j] + slat/fm * p[j]);
-//               sl[m] = sl[m-1] * cl[1] + cl[m-1] * sl[1];
-//               cl[m] = cl[m-1] * cl[1] - sl[m-1] * sl[1];
-//           }
-//           else {
-//               argument = fn*fn - fm*fm;
-//               aa = sqrt(argument);
-//               argument = ((fn - 1.0)*(fn-1.0)) - (fm * fm);
-//               bb = sqrt(argument)/aa;
-//               cc = (2. * fn - 1.0)/aa;
-//               ii = k - n;
-//               j = k - 2 * n + 1;
-//               p[k] = (fn + 1.0) * (cc * slat/fn * p[ii] - bb/(fn - 1.0) * p[j]);
-//               q[k] = cc * (slat * q[ii] - clat/fn * p[ii]) - bb * q[j];
-//           }
-//       }
-//       switch(gh) {
-//         case 3:  aa = rr * gha[l];
-//           break;
-//         case 4:  aa = rr * ghb[l];
-//           break;
-//         default: printf("\nError in subroutine shval3");
-//           break;
-//       }
-//       if (m == 0) {
-//           switch(gh) {
-//             case 3:  x = x + aa * q[k];
-//               z = z - aa * p[k];
-//               break;
-//             case 4:  xtemp = xtemp + aa * q[k];
-//               ztemp = ztemp - aa * p[k];
-//               break;
-//             default: printf("\nError in subroutine shval3");
-//               break;
-//           }
-//           l = l + 1;
-//       }
-//       else {
-//           switch(gh) {
-//             case 3:  bb = rr * gha[l+1];
-//               cc = aa * cl[m] + bb * sl[m];
-//               x = x + cc * q[k];
-//               z = z - cc * p[k];
-//               if (clat > 0) {
-//                   y = y + (aa * sl[m] - bb * cl[m]) *
-//                     fm * p[k]/((fn + 1.0) * clat);
-//               }
-//               else {
-//                   y = y + (aa * sl[m] - bb * cl[m]) * q[k] * slat;
-//               }
-//               l = l + 2;
-//               break;
-//             case 4:  bb = rr * ghb[l+1];
-//               cc = aa * cl[m] + bb * sl[m];
-//               xtemp = xtemp + cc * q[k];
-//               ztemp = ztemp - cc * p[k];
-//               if (clat > 0) {
-//                   ytemp = ytemp + (aa * sl[m] - bb * cl[m]) *
-//                     fm * p[k]/((fn + 1.0) * clat);
-//               }
-//               else {
-//                   ytemp = ytemp + (aa * sl[m] - bb * cl[m]) *
-//                     q[k] * slat;
-//               }
-//               l = l + 2;
-//               break;
-//             default: printf("\nError in subroutine shval3");
-//               break;
-//           }
-//       }
-//       m = m + 1;
-//   }
-//   if (iext != 0) {
-//       aa = ext2 * cl[1] + ext3 * sl[1];
-//       switch(gh) {
-//         case 3:   x = x - ext1 * clat + aa * slat;
-//           y = y + ext2 * sl[1] - ext3 * cl[1];
-//           z = z + ext1 * slat + aa * clat;
-//           break;
-//         case 4:   xtemp = xtemp - ext1 * clat + aa * slat;
-//           ytemp = ytemp + ext2 * sl[1] - ext3 * cl[1];
-//           ztemp = ztemp + ext1 * slat + aa * clat;
-//           break;
-//         default:  printf("\nError in subroutine shval3");
-//           break;
-//       }
-//   }
-//   switch(gh) {
-//     case 3:
-//       aa = x;
-//       x = x * cd + z * sd;
-//       z = z * cd - aa * sd;
-//       break;
-//     case 4:
-//       aa = xtemp;
-//       xtemp = xtemp * cd + ztemp * sd;
-//       ztemp = ztemp * cd - aa * sd;
-//       break;
-//     default:
-//       printf("\nError in subroutine shval3");
-//       break;
-//   }
-// }
