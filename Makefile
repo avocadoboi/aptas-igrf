@@ -1,6 +1,7 @@
 COMPILER_FLAGS := -std=c99 -Wall -Wextra -Iinclude
-# COMPILER_FLAGS := -std=c++23 -Wall -Wextra -Iinclude 
 CC := gcc
+# COMPILER_FLAGS := -std=c++23 -Wall -Wextra -Iinclude 
+# CC := g++
 
 build/test: build/aptas-igrf.o test/test.c | build
 	$(CC) $(COMPILER_FLAGS) -o $@ test/test.c build/aptas-igrf.o -lm

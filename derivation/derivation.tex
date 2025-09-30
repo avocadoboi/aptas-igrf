@@ -1,11 +1,25 @@
 \documentclass[12pt]{article}
 
+\title{Calculating the International Geomagnetic Reference Field}
+\author{Björn Sundin}
+
 \usepackage{packages}
 
 \begin{document}
 
-% \begin{equation}
-% \end{equation}
+\maketitle
+
+\section{Introduction}
+The International Geomagnetic Reference Field (IGRF) is 
+
+In a region of space without currents and electromagnetic waves, the Ampère-Maxwell becomes $\nabla\crossproduct\vect{B} = 0$ and the field can be written as the negative gradient of a potential $V$; $\vect{B} = -\nabla V$. The IGRF model provides a list of spherical harmonic coeffients $g_n^m$ and $h_n^m$, which are used in the following equation to calculate the potential:
+\begin{equation}
+  V(r, \theta, \phi) = \sum_{n\,=\,0}^N\frac{a^{n+2}}{r^{n+1}}\sum_{m\,=\,0}^n\left(g_n^m\cos(m\phi) + h_n^m\sin(m\phi)\right)P_n^m(\cos\theta).
+\end{equation}
+Here $P_n^m(x)$ is the \textit{Schmidt semi-normalized associated Legendre function} of $n$th degree and $m$th order. The coefficients are in reality functions of time. The IGRF consists of one set of coefficients for every five years, and they can be linearly interpolated in between these time points.
+
+
+\section{Associated legendre functions}
 
 \begin{tikzpicture}
   \tikzmath{\N = 5;}
@@ -16,19 +30,17 @@
     }
   }
 
-  \tikzmath{\n{end} = int(\N - 1); }
-  \foreach \m in {0, 1} {
-    \foreach \n in {2, ..., \n{end}} {
+  \pgfmathtruncatemacro{\Nminusone}{\N-1}
+  \foreach \m in {0, ..., \Nminusone} {
+    \foreach \n in {\m, ..., \Nminusone} {
       \pgfmathtruncatemacro{\next}{\n+1}
       \draw[->] (P\n\m) -- (P\next\m);
     }
   }
 
-  \foreach \n in {3, ..., \N} {
-    \foreach \m in {2, ..., \n} {
-      \pgfmathtruncatemacro{\previous}{\m-1}
-      \draw[->] (P\n\previous) -- (P\n\m);
-    }
+  \foreach \n in {0, ..., \Nminusone} {
+    \pgfmathtruncatemacro{\next}{\n+1}
+    \draw[->] (P\n\n) -- (P\next\next);
   }
 \end{tikzpicture}
 
@@ -41,6 +53,16 @@ where
   \alpha_n^m = \sqrt{(2-\delta_{m0})\frac{(n-m)!}{(n+m)!}}\frac{1}{2^nn!}(1-\mu^2)^{m/2}
 \end{equation}
 
+\begin{equation}
+  i = n - m + \begin{cases}
+    \displaystyle\sum_{k\,=\,0}^{m\,-\,1}(N-k), &\text{if }m\neq 0\\
+    0, &\text{if }m=0
+  \end{cases}
+\end{equation}
+
+\begin{equation}
+  \sum_{k\,=\,0}^{m\,-\,1}(N-k) = mN - \sum_{k\,=\,1}^{m\,-\,1}k = mN - \frac{(m-1)m}{2}
+\end{equation}
 % \begin{equation}
 %   P_n^m(\mu) = \frac{2n-1}{(n^2 - m^2)^{1/2}}\mu P_{n-1}^m(\mu) - \left(\frac{(n-1)^2 - m^2}{n^2 - m^2}\right)^{1/2}P_{n-2}^m(\mu)
 % \end{equation}

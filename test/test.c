@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-static double const equal_epsilon = 1e-3;
+static double const equal_epsilon = .5;
 
 void load_coefficients(void) {
   printf("Loading IGRF14_minified...\n");
@@ -45,25 +45,27 @@ void check_against_test_set(void) {
       exit(EXIT_FAILURE);
     }
     
-    printf("%lf %lf %lf %lf\n", latitude, longitude, altitude, year);
-    printf("%lf %lf %lf\n", expected_field.east, expected_field.north, expected_field.up);
+    printf("lat %.5g lon %.5g alt %.5g km yr %.5g\n", latitude, longitude, altitude, year);
     magnetic_field_vector_t const calculated_field = calculate_model_geomagnetic_field(latitude, longitude, altitude, year);
-    printf("%lf %lf %lf\n", calculated_field.east, calculated_field.north, calculated_field.up);
+    printf("(%.5g, %.5g, %.5g)\n", expected_field.east, expected_field.north, expected_field.up);
+    printf("(%.5g, %.5g, %.5g)\n", calculated_field.east, calculated_field.north, calculated_field.up);
 
-    printf(
-      "%.3g\t%.3g\t%.3g\n\n", 
-      fabs(calculated_field.east - expected_field.east),
-      fabs(calculated_field.north - expected_field.north),
-      fabs(calculated_field.up - expected_field.up)
-    );
-
+    double const err_east = fabs(calculated_field.east - expected_field.east);
+    double const err_north = fabs(calculated_field.north - expected_field.north);
+    double const err_up = fabs(calculated_field.up - expected_field.up);
+    printf("(%.3g, %.3g, %.3g)\n", err_east, err_north, err_up);
+    if (err_east > equal_epsilon || err_north > equal_epsilon || err_up > equal_epsilon) {
+      printf("TEST FAILED: too large error.\n");
+      exit(EXIT_FAILURE);
+    }
   }
 }
 
 int main(void) {
   load_coefficients();
 
-  // check_against_test_set();
-  magnetic_field_vector_t const field = calculate_model_geomagnetic_field(85.f, 0., 0., 2025.);
-  printf("East: %.5g\tNorth: %.5g\tUp: %.5g\n", field.east, field.north, field.up);
+  check_against_test_set();
+
+  // magnetic_field_vector_t const field = calculate_model_geomagnetic_field(90., 0., 0., 2025.);
+  // printf("East: %.5g\tNorth: %.5g\tUp: %.5g\n", field.east, field.north, field.up);
 }

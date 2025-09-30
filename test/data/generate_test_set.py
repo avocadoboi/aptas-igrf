@@ -11,7 +11,7 @@ def decimal_year(date: datetime) -> float:
 
 EARTH_RADIUS = 6371.2
 longitudes = linspace(0, 360, 5, endpoint=False)
-co_latitudes = linspace(5, 175, 5)
+co_latitudes = linspace(1, 179, 10)
 altitudes = linspace(0, 1000, 5)
 dates = linspace(datetime(2025, 1, 1), datetime(2030, 1, 1), 5)
 with open("test_set", "w") as file:
