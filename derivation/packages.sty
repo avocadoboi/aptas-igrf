@@ -1,18 +1,18 @@
 \usepackage[a4paper, margin={3cm, 2.5cm}]{geometry}
 % \usepackage[english]{babel}
 
-% \usepackage{xcolor}
-% \definecolor{my-pink}{rgb}{0.8, 0.2, 0.5}
-%
-% \usepackage{hyperref}
-% \hypersetup{
-% 	colorlinks=true,
-% 	citecolor=black,
-% 	linkcolor=black,
-% 	urlcolor=my-pink
-% }
+\usepackage{xcolor}
+\definecolor{my-pink}{rgb}{0.8, 0.2, 0.5}
 
-% \usepackage[style=apa]{biblatex}
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks=true,
+	citecolor=black,
+	linkcolor=black,
+	urlcolor=my-pink
+}
+
+\usepackage[style=apa]{biblatex}
 
 \newcommand{\vect}[1]{\boldsymbol{\mathbf{#1}}}
 \newcommand{\uvect}[1]{\vect{\hat{#1}}}
@@ -33,6 +33,9 @@
 \usepackage{mathtools}
 \mathtoolsset{showonlyrefs}
 
+\DeclarePairedDelimiter{\ceil}{\lceil}{\rceil}
+\DeclarePairedDelimiter{\floor}{\lfloor}{\rfloor}
+
 % \usepackage{fontspec}
 \usepackage{notomath}
 % \setmainfont{Noto Serif Regular}[Scale=0.9]
@@ -40,8 +43,8 @@
 % \setsansfont{Noto Sans Display}
 
 \usepackage{enumitem}
-% \usepackage[font=small, labelfont=bf, justification=raggedright]{caption}
-% \usepackage[]{subcaption}
+\usepackage[font=small, labelfont=bf, justification=raggedright]{caption}
+\usepackage[]{subcaption}
 \usepackage{dirtytalk}
 \usepackage[htt]{hyphenat}
 % \usepackage[stable]{footmisc}
@@ -60,5 +63,4 @@
 % \usepackage{pdfpages}
 
 \usepackage{tikz}
-\usetikzlibrary{positioning}
-\usetikzlibrary{math}
+\usetikzlibrary{positioning, math, arrows}
