@@ -56,62 +56,13 @@ IGRFError load_IGRF_coefficients(char const* const file_name) {
   return IGRFError_Success;
 }
 
-#define P_NM_INITIAL_N 2
-#define P_NM_INITIAL_COUNT (P_NM_INITIAL_N + 1)*(P_NM_INITIAL_N + 2)/2
 typedef struct {
-  double P_nm_initial[P_NM_INITIAL_COUNT];
-  double P_nm_derivative_initial[P_NM_INITIAL_COUNT];
-
   double P_up[2];
   double P_up_derivative[2];
 
   double P_nn;
   double P_nn_derivative;
 } associated_legendre_state_t;
-
-unsigned P_nm_initial_index(unsigned const n, unsigned const m) {
-  return n + m*P_NM_INITIAL_N - m*(m - 1)/2;
-}
-
-static void init_associated_legendre_state(
-  associated_legendre_state_t* const legendre_state, 
-  double const cos_theta, double const sin_theta
-) {
-#ifdef CPP_ASSOC_LEGENDRE_TESTING
-  memcpy(legendre_state->P_nm_initial, std::array<double, P_NM_INITIAL_COUNT>{
-#else
-  memcpy(legendre_state->P_nm_initial, (double[P_NM_INITIAL_COUNT]){
-#endif
-// n increases to the right, m increases downwards.
-//  0  1          2
-    1, cos_theta, 0.5f*(3*cos_theta*cos_theta - 1), 
-//     3          4 
-       sin_theta, (double)sqrt_3*cos_theta*sin_theta, 
-//                5
-                  0.5f*(double)sqrt_3*sin_theta*sin_theta
-#ifdef CPP_ASSOC_LEGENDRE_TESTING
-  }.data(), sizeof(legendre_state->P_nm_initial));
-#else
-  }, sizeof(legendre_state->P_nm_initial));
-#endif
-
-#ifdef CPP_ASSOC_LEGENDRE_TESTING
-  memcpy(legendre_state->P_nm_derivative_initial, std::array<double, P_NM_INITIAL_COUNT>{
-#else
-  memcpy(legendre_state->P_nm_derivative_initial, (double[P_NM_INITIAL_COUNT]){
-#endif
-//  0   1          2
-    0, -sin_theta, -3*cos_theta*sin_theta, 
-//      3          4 
-        cos_theta, (double)sqrt_3*(cos_theta*cos_theta - sin_theta*sin_theta),
-//                 5
-                   (double)sqrt_3*sin_theta*cos_theta
-#ifdef CPP_ASSOC_LEGENDRE_TESTING
-  }.data(), sizeof(legendre_state->P_nm_derivative_initial));
-#else
-  }, sizeof(legendre_state->P_nm_derivative_initial));
-#endif
-}
 
 typedef struct {
   double P_nm;
@@ -122,37 +73,20 @@ static associated_legendre_pair_t next_associated_legendre(
   unsigned const n, unsigned const m, associated_legendre_state_t* const legendre, 
   double const cos_theta, double const sin_theta
 ) {
-  if (n <= P_NM_INITIAL_N) {
-    unsigned const index = P_nm_initial_index(n, m);
-    return (associated_legendre_pair_t){
-      .P_nm = legendre->P_nm_initial[index],
-      .P_nm_derivative = legendre->P_nm_derivative_initial[index]
-    };
-  }
-  // If it's the first row to be filled in using recurrence relations, we need to prepare the
-  // P_nn or P_up values for the first time.
-  if (n == P_NM_INITIAL_N + 1) {
-    if (n == m) { // The P_nm will be based on P_nm_initial at the index below, diagnally above.
-      unsigned const index = P_nm_initial_index(n - 1, m - 1);
-      legendre->P_nn = legendre->P_nm_initial[index];
-      legendre->P_nn_derivative = legendre->P_nm_derivative_initial[index];
+  if (n == 1) {
+    if (m == 0) {
+      legendre->P_up[0] = 1;
+      legendre->P_up_derivative[0] = 0;
     }
-    else { // P_nm has at least one P_nm_initial above it.
-      unsigned const index_1 = P_nm_initial_index(n - 1, m);
-      legendre->P_up[0] = legendre->P_nm_initial[index_1];
-      legendre->P_up_derivative[0] = legendre->P_nm_derivative_initial[index_1];
-      // If there are two P_nm_initial above this one.
-      if (m < n - 1) {
-        unsigned const index_2 = P_nm_initial_index(n - 2, m);
-        legendre->P_up[1] = legendre->P_nm_initial[index_2];
-        legendre->P_up_derivative[1] = legendre->P_nm_derivative_initial[index_2];
-      } 
+    else {
+      legendre->P_nn = 1;
+      legendre->P_nn_derivative = 0;
     }
   }
 
   // Diagonal recurrence
   if (n == m) {
-    double const A = sqrt(1. - 1./(double)(2*n));
+    double const A = sqrt((n == 1 ? 2 : 1)*(1 - 1./(double)(2*n)));
     // P_nn is for saving the value until we get to P_{n+1}^{n+1} after being finished looping through the current column,
     // P_up is for saving the value until we get to the very next index, P_{n+1}^n.
     legendre->P_nn_derivative = A*(sin_theta*legendre->P_nn_derivative + cos_theta*legendre->P_nn);
@@ -166,7 +100,6 @@ static associated_legendre_pair_t next_associated_legendre(
   }
 
   // Otherwise, downwards recurrence
-
   double const A = (double)(2*n - 1)/sqrt((double)(n*n - m*m));
 
   // If there is only one (nonzero) P_n^m (i.e. P_{n-1}^m) above the current one 
@@ -206,9 +139,9 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(double const latitude,
   double const r = igrf_earth_radius + altitude;
   double const year_factor = decimal_year - 2025.;
 
-  // Initialize everything except for the P_nm_left and P_nm_left_derivative, those need to be filled in once we have propagated down for the first time.
+  // Does not need to be initialized now. 
   associated_legendre_state_t legendre_state;
-  init_associated_legendre_state(&legendre_state, cos_theta, sin_theta);
+  // init_associated_legendre_state(&legendre_state, cos_theta, sin_theta);
 
   magnetic_field_vector_t field = {0};
   unsigned g_index = 0;

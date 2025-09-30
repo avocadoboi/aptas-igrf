@@ -66,6 +66,6 @@ int main(void) {
 
   check_against_test_set();
 
-  // magnetic_field_vector_t const field = calculate_model_geomagnetic_field(90., 0., 0., 2025.);
+  // magnetic_field_vector_t const field = calculate_model_geomagnetic_field(84., 0., 0., 2025.);
   // printf("East: %.5g\tNorth: %.5g\tUp: %.5g\n", field.east, field.north, field.up);
 }
