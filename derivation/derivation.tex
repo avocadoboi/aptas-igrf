@@ -13,20 +13,32 @@
 \section{Introduction}
 The International Geomagnetic Reference Field (IGRF) is a three-dimensional model of Earth's internally generated magnetic field that is developed by the International Association of Geomagnetism and Aeronomy (IAGA) \parencite{Alken2021}. A new version is released every five years, because the process by which Earth's magnetic field is generated (magnetohydrodynamic dynamo) causes Earth's magnetic field to change over time.
 
-In a region of space without currents or electromagnetic waves, the Ampère-Maxwell equation becomes $\nabla\crossproduct\vect{B} = 0$ and the field can be written as the negative gradient of a potential $V$; $\vect{B} = -\nabla V$. The IGRF model provides a list of spherical harmonic coeffients $g_n^m$ and $h_n^m$, which are used in the following equation to calculate the potential:
+In a region of space without currents or electromagnetic waves, the Ampère-Maxwell equation becomes $\nabla\crossproduct\vect{B} = 0$ and the field can be written as the negative gradient of a potential $V$; $\vect{B} = -\nabla V$. The IGRF model provides a list of spherical harmonic coeffients $g_n^m$ and $h_n^m$ which are used in the following equation to calculate the potential:
 \begin{equation}
   V(r, \theta, \phi) = \sum_{n\,=\,0}^N\frac{a^{n+2}}{r^{n+1}}\sum_{m\,=\,0}^n\left(g_n^m\cos(m\phi) + h_n^m\sin(m\phi)\right)P_n^m(\cos\theta).
 \end{equation}
-Here $P_n^m(x)$ is the \textit{Schmidt semi-normalized associated Legendre function} of $n$th degree and $m$th order, $a = 6371.2$ is Earth's mean radius, $r$ is the distance from Earth's center, $\theta$ is the co-latitude, and $\phi$ is the longitude. The coefficients are in reality functions of time. The IGRF provides them at five-year intervals, and between these points they can be estimated via linear interpolation.
+Here $P_n^m(x)$ is the \textit{Schmidt semi-normalized associated Legendre function} of $n$th degree and $m$th order, $a = \SI{6371.2}{\km}$ is Earth's mean radius, $r$ is the distance from Earth's center to the point the magnetic field is to be calculated at, $\theta$ is its co-latitude, and $\phi$ is its longitude. The coefficients are in reality functions of time. The IGRF provides them at five-year intervals, and between these points they can be estimated via linear interpolation. 
+
+Since we are using spherical coordinates, the magnetic field has the form 
+\begin{equation}
+  \vect{B} = -\nabla V = -\derivative{V}{r}\uvect{r} -\frac{1}{r}\derivative{V}{\theta}\uvect{\theta} - \frac{1}{r\sin\theta}\derivative{V}{\phi}\uvect{\phi}
+\end{equation}
+and the components can be expanded as
+\begin{align}
+  B_r &= \sum_{n\,=\,0}^N(n+1)\left(\frac{a}{r}\right)^{n+2}\sum_{m\,=\,0}^n\left(g_n^m\cos(m\phi) + h_n^m\sin(m\phi)\right)P_n^m(\cos\theta)\\ 
+  B_\theta &= -\sum_{n\,=\,0}^N\left(\frac{a}{r}\right)^{n+2}\sum_{m\,=\,0}^n\left(g_n^m\cos(m\phi) + h_n^m\sin(m\phi)\right)\derivative{\theta}P_n^m(\cos\theta)\\ 
+  B_\phi &= \sum_{n\,=\,0}^N\left(\frac{a}{r}\right)^{n+2}\sum_{m\,=\,0}^n\left(g_n^mm\sin(m\phi) - h_n^mm\cos(m\phi)\right)P_n^m(\cos\theta)
+\end{align}
+Here we see that we not only need $P_n^m(\cos\theta)$, we also need its derivative with respect to $\theta$.
 
 \section{Associated legendre functions}
 
-The $n$th degree, $m$th order associated legendre function is defined as
+The $n$th degree, $m$th order associated legendre function with Schmidt semi-normalization is defined as \parencite{Winch2005}
 \begin{equation}
   P_n^m(x) = \alpha_n^m(x)D^{m+n}(x^2-1)^n
 \end{equation}
 where
-\begin{equation}
+\begin{equation}\label{eq:alpha}
   \alpha_n^m(x) = \sqrt{(2-\delta_{m0})\frac{(n-m)!}{(n+m)!}}\frac{1}{2^nn!}(1-x^2)^{m/2},
 \end{equation}
 $\delta_{m0}$ is the Kronecker delta ($1$ for $m=0$ and $0$ otherwise) and $D = \derivative*{x}$ is the differentiation operator with respect to $x$.
@@ -64,15 +76,15 @@ This is more readily calculated, although it is still very computationally expen
 \begin{figure}[htbp]
   \centering
   \begin{tikzpicture}[>=stealth]
-    \tikzmath{\N = 5;}
+    \tikzmath{\nmax= 5;}
 
-    \foreach \n in {0, ..., \N} {
+    \foreach \n in {0, ..., \nmax} {
       \foreach \m in {0, ..., \n} {
         \node (P\n\m) at (\m, -\n) {$P_{\n}^{\m}$};
       }
     }
 
-    \pgfmathtruncatemacro{\Nminusone}{\N-1}
+    \pgfmathtruncatemacro{\Nminusone}{\nmax-1}
     \foreach \m in {0, ..., \Nminusone} {
       \foreach \n in {\m, ..., \Nminusone} {
         \pgfmathtruncatemacro{\next}{\n+1}
@@ -89,13 +101,20 @@ This is more readily calculated, although it is still very computationally expen
   \label{fig:recurrence-diagram}
 \end{figure}
 
-The idea is to instead calculate the associated Legendre functions using \textit{recurrence relations}, where each $P_n^m$ is calculated from previously calculated $P_n^m$ values. This is especially fitting for the purposes of calculating the IGRF because we need to use every single $P_n^m$ up to $n=13$, so we are effectively spreading the calculations out between $P_n^m$s and avoid repeating the same calculations many times. 
+Instead of calculating each associated Legendre function by itself, a better idea is to calculate each $P_n^m$ from previously calculated $P_n^m$ values. This is especially fitting for the purposes of calculating the IGRF because we need to use every single $P_n^m$ up to $n=13$, so we are effectively spreading the calculations out between $P_n^m$s and avoid repeating the same calculations many times. 
 
-The recurrence scheme can be done in many different ways. It turns out that doing it row-by-row (where each $n$ is a row and each $m$ is a column) leads to recurrence relations involving division by $\sin\theta$, which leads to the values exploding when near the poles. Instead we do it column-by-column, as illustrated in \autoref{fig:recurrence-diagram}. The recurrence relations are derived below.
+The recurrence scheme can be done in many different ways. It turns out that doing it row-by-row (where each $n$ is a row and each $m$ is a column) leads to recurrence relations involving division by $\sin\theta$, which leads to the values exploding when near the poles. Instead we do it column-by-column, as illustrated in \autoref{fig:recurrence-diagram}. It all starts from $P_0^0$, which we can calculate to be 
+\begin{align}
+  P_0^0(x) = \sqrt{(2 - 1)\frac{0!}{0!}}\frac{1}{2^0\cdot 0!}(1 - x^2)^0 = 1
+\end{align}
+with a derivative with respect to $x$ that is identically zero.
+
+The recurrence relations are derived below and are illustrated individually in \autoref{fig:individual-recurrence-relations}; both use two previous values.
 
 \begin{figure}[htbp]
   \centering
-  \begin{subfigure}{.49\linewidth}
+  \begin{subfigure}{.25\linewidth}
+    \centering
     \begin{tikzpicture}[>=stealth]
       \node (Pnm) at (0, 0) {$P_{n}^{m}$};
       \node (Pn1m1) at (-1, 1) {$P_{n-1}^{m-1}$};
@@ -105,26 +124,53 @@ The recurrence scheme can be done in many different ways. It turns out that doin
     \end{tikzpicture}
     \caption{}
   \end{subfigure}
-  \begin{subfigure}{.49\linewidth}
+  \begin{subfigure}{.25\linewidth}
+    \centering
     \begin{tikzpicture}[>=stealth]
       \node (Pnm) at (0, 0) {$P_{n}^{m}$};
       \node (Pn1m) at (0, 1) {$P_{n-1}^{m}$};
       \node (Pn2m) at (0, 2) {$P_{n-2}^{m}$};
-      \draw[->] (Pn2m) -- (Pnm);
+      \draw[->] (Pn2m) to[out=-135, in=135] (Pnm);
       \draw[->] (Pn1m) -- (Pnm);
     \end{tikzpicture}
     \caption{}
   \end{subfigure}
   \caption{Diagrams illustrating the two recurrence relations used.}
+  \label{fig:individual-recurrence-relations}
 \end{figure}
 
 \subsubsection{Diagonal}
 
 The idea for finding the recurrence relations is to use the formula
 \begin{equation}
-  D^{n+m}fg = \sum_{k\,=\,0}^{n\,+\,m}{n+m\choose k}(D^kf)(D^{n+m-k}g)
+  D^{n}fg = \sum_{k\,=\,0}^{n}{n\choose k}(D^kf)(D^{n-k}g)
 \end{equation}
 which can also be proven by induction.
+
+Applying it after first performing the first derivative, we get
+\begin{align}
+  Q_n^m &= D^{n+m}(x^2 - 1)^n = D^{n + m - 1}n(x^2 - 1)^{n-1}2x\\ 
+  &= 2n\sum_{k\,=\,0}^{n+m-1}{n+m-1\choose k}\left(D^k x\right)\left(D^{n+m-1-k}(x^2 - 1)^{n-1}\right)\\ 
+  &= 2n\left(xD^{n+m-1}(x^2 - 1)^{n-1} + (n+m-1)D^{n+m-2}(x^2-1)^{n-1}\right)
+\end{align}
+and since $Q_{n-1}^{m} = D^{n-1+m}(x^2-1)^{n-1}$ and $Q_{n-1}^{m-1}=D^{n-1+m-1}(x^2-1)^{n-1}$, we get
+\begin{equation}
+  Q_n^m = 2nxQ_{n-1}^m + 2n(n+m-1)Q_{n-1}^{m-1}.
+\end{equation}
+Since $Q_n^m=P_n^m/\alpha_n^m$, we can rewrite this as 
+\begin{equation}
+  P_n^m = 2nx\frac{\alpha_n^m}{\alpha_{n-1}^m}P_{n-1}^m + 2n(n+m-1)\frac{\alpha_n^m}{\alpha_{n-1}^{m-1}}P_{n-1}^{m-1}.
+\end{equation}
+Expanding the alphas using equation \eqref{eq:alpha},
+\begin{align}
+  \frac{\alpha_n^m}{\alpha_{n-1}^m} &= \sqrt{\frac{(n-m)!(n-1+m)!}{(n-1-m)!(n+m)!}}\frac{2^{n-1}(n-1)!}{2^nn!}\\ 
+                                    &= \sqrt{\frac{n-1}{n+m}}\frac{1}{2n}
+\end{align}
+and
+\begin{align}
+  \frac{\alpha_n^m}{\alpha_{n-1}^{m-1}} &= \sqrt{}
+\end{align}
+
 \subsubsection{Downwards}
 % \begin{equation}
 %   i = n - m + \begin{cases}

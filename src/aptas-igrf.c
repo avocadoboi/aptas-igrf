@@ -173,7 +173,7 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(double const latitude,
       field.north += radial_factor*(g_nm*cos_mphi + h_nm*sin_mphi)*new_legendre.P_nm_derivative;
       // East/west doesn't make sense if we're right at a pole and we get division by 0.
       if (sin_theta > 1e-8) {
-        field.east -= radial_factor*(h_nm*m*cos_mphi - g_nm*m*sin_mphi)*new_legendre.P_nm/sin_theta;
+        field.east += radial_factor*(g_nm*m*sin_mphi - h_nm*m*cos_mphi)*new_legendre.P_nm/sin_theta;
       }
     }
   }
