@@ -17,7 +17,7 @@ In a region of space without currents or electromagnetic waves, the Ampère-Maxw
 \begin{equation}
   V(r, \theta, \phi) = \sum_{n\,=\,0}^N\frac{a^{n+2}}{r^{n+1}}\sum_{m\,=\,0}^n\left(g_n^m\cos(m\phi) + h_n^m\sin(m\phi)\right)P_n^m(\cos\theta).
 \end{equation}
-Here $P_n^m(x)$ is the \textit{Schmidt semi-normalized associated Legendre function} of $n$th degree and $m$th order. The coefficients are in reality functions of time. The IGRF provides them at five-year intervals, and between these points they can be estimated via linear interpolation.
+Here $P_n^m(x)$ is the \textit{Schmidt semi-normalized associated Legendre function} of $n$th degree and $m$th order, $a = 6371.2$ is Earth's mean radius, $r$ is the distance from Earth's center, $\theta$ is the co-latitude, and $\phi$ is the longitude. The coefficients are in reality functions of time. The IGRF provides them at five-year intervals, and between these points they can be estimated via linear interpolation.
 
 \section{Associated legendre functions}
 
@@ -89,7 +89,9 @@ This is more readily calculated, although it is still very computationally expen
   \label{fig:recurrence-diagram}
 \end{figure}
 
-The idea is to 
+The idea is to instead calculate the associated Legendre functions using \textit{recurrence relations}, where each $P_n^m$ is calculated from previously calculated $P_n^m$ values. This is especially fitting for the purposes of calculating the IGRF because we need to use every single $P_n^m$ up to $n=13$, so we are effectively spreading the calculations out between $P_n^m$s and avoid repeating the same calculations many times. 
+
+The recurrence scheme can be done in many different ways. It turns out that doing it row-by-row (where each $n$ is a row and each $m$ is a column) leads to recurrence relations involving division by $\sin\theta$, which leads to the values exploding when near the poles. Instead we do it column-by-column, as illustrated in \autoref{fig:recurrence-diagram}. The recurrence relations are derived below.
 
 \begin{figure}[htbp]
   \centering
@@ -116,8 +118,14 @@ The idea is to
   \caption{Diagrams illustrating the two recurrence relations used.}
 \end{figure}
 
+\subsubsection{Diagonal}
 
-
+The idea for finding the recurrence relations is to use the formula
+\begin{equation}
+  D^{n+m}fg = \sum_{k\,=\,0}^{n\,+\,m}{n+m\choose k}(D^kf)(D^{n+m-k}g)
+\end{equation}
+which can also be proven by induction.
+\subsubsection{Downwards}
 % \begin{equation}
 %   i = n - m + \begin{cases}
 %     \displaystyle\sum_{k\,=\,0}^{m\,-\,1}(N-k), &\text{if }m\neq 0\\
