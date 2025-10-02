@@ -109,7 +109,7 @@ The recurrence scheme can be done in many different ways. It turns out that doin
 \end{align}
 with a derivative with respect to $x$ that is identically zero.
 
-The recurrence relations are derived below and are illustrated individually in \autoref{fig:individual-recurrence-relations}; both use two previous values.
+The recurrence relations are derived below and are illustrated individually in \autoref{fig:individual-recurrence-relations}; both use two previous values, but one of them might be zero.
 
 \begin{figure}[htbp]
   \centering
@@ -122,7 +122,8 @@ The recurrence relations are derived below and are illustrated individually in \
       \draw[->] (Pn1m1) -- (Pnm);
       \draw[->] (Pn1m) -- (Pnm);
     \end{tikzpicture}
-    \caption{}
+    \caption{Diagonal}
+    \label{fig:recurrence-diag}
   \end{subfigure}
   \begin{subfigure}{.25\linewidth}
     \centering
@@ -133,7 +134,8 @@ The recurrence relations are derived below and are illustrated individually in \
       \draw[->] (Pn2m) to[out=-135, in=135] (Pnm);
       \draw[->] (Pn1m) -- (Pnm);
     \end{tikzpicture}
-    \caption{}
+    \caption{Downwards}
+    \label{fig:recurrence-down}
   \end{subfigure}
   \caption{Diagrams illustrating the two recurrence relations used.}
   \label{fig:individual-recurrence-relations}
@@ -154,24 +156,26 @@ Applying it after first performing the first derivative, we get
   &= 2n\left(xD^{n+m-1}(x^2 - 1)^{n-1} + (n+m-1)D^{n+m-2}(x^2-1)^{n-1}\right)
 \end{align}
 and since $Q_{n-1}^{m} = D^{n-1+m}(x^2-1)^{n-1}$ and $Q_{n-1}^{m-1}=D^{n-1+m-1}(x^2-1)^{n-1}$, we get
-\begin{equation}
+\begin{equation}\label{eq:recurrence-diag-Q}
   Q_n^m = 2nxQ_{n-1}^m + 2n(n+m-1)Q_{n-1}^{m-1}.
 \end{equation}
 Since $Q_n^m=P_n^m/\alpha_n^m$, we can rewrite this as 
 \begin{equation}
   P_n^m = 2nx\frac{\alpha_n^m}{\alpha_{n-1}^m}P_{n-1}^m + 2n(n+m-1)\frac{\alpha_n^m}{\alpha_{n-1}^{m-1}}P_{n-1}^{m-1}.
 \end{equation}
-Expanding the alphas using equation \eqref{eq:alpha},
+Now we have the recurrence relation illustrated in \autoref{fig:recurrence-diag}. We will want to use this to calculate the topmost values in \autoref{fig:recurrence-diagram}, where $m=n$. But as we saw in the last section, $P_{m-1}^m = 0$. Hence, setting $m = n$ we get 
+\begin{equation}
+  P_m^m = 2m(2m-1)\frac{\alpha_m^m}{\alpha_{m-1}^{m-1}}P_{m-1}^{m-1}.
+\end{equation}
+Expanding the alphas using equation \eqref{eq:alpha}, we get (assuming $m>0$, since the first value to calculate using this recurrence relation is $P_1^1$)
 \begin{align}
-  \frac{\alpha_n^m}{\alpha_{n-1}^m} &= \sqrt{\frac{(n-m)!(n-1+m)!}{(n-1-m)!(n+m)!}}\frac{2^{n-1}(n-1)!}{2^nn!}\\ 
-                                    &= \sqrt{\frac{n-1}{n+m}}\frac{1}{2n}
-\end{align}
-and
-\begin{align}
-  \frac{\alpha_n^m}{\alpha_{n-1}^{m-1}} &= \sqrt{}
+  \frac{\alpha_n^m}{\alpha_{n-1}^{m-1}} &= \sqrt{\frac{(2-0)(n-1+m-1)!}{(2-\delta_{m1})(n+m)!}}\frac{1}{2n}\frac{(1-x^2)^{m/2}}{(1-x^2)^{(m-1)/2}}\\ 
+                                        &= \sqrt{\frac{1+\delta_{m1}}{(n+m)(n+m-1)}}\frac{1}{2n}(1-x^2)^{1/2}
 \end{align}
 
 \subsubsection{Downwards}
+Finding the recurrence relation shown in \autoref{fig:recurrence-down} was a bit more difficult, and the technique I found involves combining the recurrence relation in \autoref{fig:recurrence-diagram} with 
+
 % \begin{equation}
 %   i = n - m + \begin{cases}
 %     \displaystyle\sum_{k\,=\,0}^{m\,-\,1}(N-k), &\text{if }m\neq 0\\

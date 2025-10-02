@@ -141,7 +141,6 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(double const latitude,
 
   // Does not need to be initialized now. 
   associated_legendre_state_t legendre_state;
-  // init_associated_legendre_state(&legendre_state, cos_theta, sin_theta);
 
   magnetic_field_vector_t field = {0};
   unsigned g_index = 0;
