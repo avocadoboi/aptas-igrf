@@ -64,7 +64,7 @@ Both of these formulas can be proven by induction. Applying them, we get
 \end{equation}
 Since
 \begin{equation}
-  m + n > 2k \Longleftrightarrow k < \frac{m+n}{2},
+  m + n > 2k \iff k < \frac{m+n}{2},
 \end{equation}
 all terms with $k<\ceil{(m+n)/2}$ are zero, and the equation can be simplified to
 \begin{equation}
@@ -107,7 +107,7 @@ The recurrence scheme can be done in many different ways. It turns out that doin
 \begin{align}
   P_0^0(x) = \sqrt{(2 - 1)\frac{0!}{0!}}\frac{1}{2^0\cdot 0!}(1 - x^2)^0 = 1
 \end{align}
-with a derivative with respect to $x$ that is identically zero.
+with a derivative with respect to $x$ (or $\theta$, when $x=\cos\theta$) that is identically zero.
 
 The recurrence relations are derived below and are illustrated individually in \autoref{fig:individual-recurrence-relations}; both use two previous values, but one of them might be zero.
 
@@ -149,7 +149,7 @@ The idea for finding the recurrence relations is to use the formula
 \end{equation}
 which can also be proven by induction.
 
-Applying it after first performing the first derivative, we get
+Applying it after performing the first derivative, we get
 \begin{align}
   Q_n^m &= D^{n+m}(x^2 - 1)^n = D^{n + m - 1}n(x^2 - 1)^{n-1}2x\\ 
   &= 2n\sum_{k\,=\,0}^{n+m-1}{n+m-1\choose k}\left(D^k x\right)\left(D^{n+m-1-k}(x^2 - 1)^{n-1}\right)\\ 
@@ -164,17 +164,87 @@ Since $Q_n^m=P_n^m/\alpha_n^m$, we can rewrite this as
   P_n^m = 2nx\frac{\alpha_n^m}{\alpha_{n-1}^m}P_{n-1}^m + 2n(n+m-1)\frac{\alpha_n^m}{\alpha_{n-1}^{m-1}}P_{n-1}^{m-1}.
 \end{equation}
 Now we have the recurrence relation illustrated in \autoref{fig:recurrence-diag}. We will want to use this to calculate the topmost values in \autoref{fig:recurrence-diagram}, where $m=n$. But as we saw in the last section, $P_{m-1}^m = 0$. Hence, setting $m = n$ we get 
-\begin{equation}
+\begin{equation}\label{eq:recurrence-diag-P-alpha}
   P_m^m = 2m(2m-1)\frac{\alpha_m^m}{\alpha_{m-1}^{m-1}}P_{m-1}^{m-1}.
 \end{equation}
 Expanding the alphas using equation \eqref{eq:alpha}, we get (assuming $m>0$, since the first value to calculate using this recurrence relation is $P_1^1$)
 \begin{align}
-  \frac{\alpha_n^m}{\alpha_{n-1}^{m-1}} &= \sqrt{\frac{(2-0)(n-1+m-1)!}{(2-\delta_{m1})(n+m)!}}\frac{1}{2n}\frac{(1-x^2)^{m/2}}{(1-x^2)^{(m-1)/2}}\\ 
-                                        &= \sqrt{\frac{1+\delta_{m1}}{(n+m)(n+m-1)}}\frac{1}{2n}(1-x^2)^{1/2}
+  \frac{\alpha_m^m}{\alpha_{m-1}^{m-1}} &= \sqrt{\frac{(2-0)(m-1+m-1)!}{(2-\delta_{m1})(m+m)!}}\frac{1}{2m}\frac{(1-x^2)^{m/2}}{(1-x^2)^{(m-1)/2}}\\ 
+                                        &= \sqrt{\frac{1+\delta_{m1}}{2m(2m-1)}}\frac{1}{2m}(1-x^2)^{1/2}
+\end{align}
+and substituting this back into \eqref{eq:recurrence-diag-P-alpha} results in
+\begin{align}
+  P_m^m(x) = \sqrt{(1+\delta_{m1})\frac{2m-1}{2m}}(1-x^2)^{1/2}P_{m-1}^{m-1}
+\end{align}
+or, with $x=\cos\theta$,
+\begin{align}
+  \boxed{P_m^m(\cos\theta) = \sqrt{(1+\delta_{m1})\left(1-\frac{1}{2m}\right)}\sin(\theta) P_{m-1}^{m-1}(\cos\theta)}
 \end{align}
 
 \subsubsection{Downwards}
-Finding the recurrence relation shown in \autoref{fig:recurrence-down} was a bit more difficult, and the technique I found involves combining the recurrence relation in \autoref{fig:recurrence-diagram} with 
+Finding the recurrence relation shown in \autoref{fig:recurrence-down} was a bit more difficult, and the technique I found involves combining the recurrence relation in \autoref{fig:recurrence-diag} with the one illustrated in \autoref{fig:intermediary-recurrence}.
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[>=stealth]
+    \node (Pnm) at (0, 0) {$P_{n}^{m}$};
+    % \node[text=gray] (Pn1m) at (0, 1) {$P_{n-1}^{m}$};
+    \node (Pn2m) at (0, 2) {$P_{n-2}^{m}$};
+    \node (Pn1m1) at (-1, 1) {$P_{n-1}^{m-1}$};
+    % \draw[->] (Pn2m) to[out=-45, in=45] (Pnm);
+    \draw[->] (Pn2m) -- (Pnm);
+    \draw[->] (Pn1m1) -- (Pnm);
+  \end{tikzpicture}
+  \caption{Recurrence relation used together with the recurrence relation in \autoref{fig:recurrence-diag} to create the downward recurrence relation.}
+  \label{fig:intermediary-recurrence}
+\end{figure}
+
+This time we start by applying the first two derivatives:
+\begin{align}
+  Q_n^m &= D^{n+m}(x^2-1)^n = D^{n+m-1}n(x^2-1)^{n-1}2x \\ 
+        &= 2nD^{n+m-2}\left((x^2-1)^{n-1}+x(n-1)(x^2-1)^{n-2}2x\right)\\ 
+        &= 2nQ_{n-1}^{m-1} + 4n(n-1)D^{n+m-2}x^2(x^2-1)^{n-2}.
+\end{align}
+Applying the algebraic identity 
+\begin{align}
+  x^2(x^2-1)^{n-2} = (x^2-1)(x^2-1)^{n-2} + 1(x^2-1)^{n-2} = (x^2-1)^{n-1} + (x^2-1)^{n-2}
+\end{align}
+and identifying $Q_{n-1}^{m-1}=D^{n+m-2}(x^2-1)^{n-1}$ and $Q_{n-2}^{m}=D^{n+m-2}(x^2-1)^{n-2}$,
+\begin{align}
+  Q_n^m &= 2nQ_{n-1}^{m-1} + 4n(n-1)\left(Q_{n-1}^{m-1} + Q_{n-2}^m\right)\\ 
+        &= 2n(2n - 1)Q_{n-1}^{m-1} + 4n(n-1)Q_{n-2}^m
+\end{align}
+which corresponds to the diagram in \autoref{fig:intermediary-recurrence}. Now we multiply both sides by $(n+m-1)/(2n-1)$ and rearrange to get 
+\begin{align}
+  2n(n+m-1)Q_{n-1}^{m-1} = \frac{n+m-1}{2n-1}Q_n^m - \frac{4n(n-1)(n+m-1)}{2n-1}Q_{n-2}^m
+\end{align}
+which can be substituted in \eqref{eq:recurrence-diag-Q} to give 
+\begin{align}
+  Q_n^m &= 2nxQ_{n-1}^m + \frac{n+m-1}{2n-1}Q_n^m - \frac{4n(n-1)(n+m-1)}{2n-1}Q_{n-2}^m\\
+  \iff \frac{2n-1-n-m+1}{2n-1}Q_n^m &= \frac{n-m}{2n-1}Q_n^m = 2nxQ_{n-1}^m - \frac{4n(n-1)(n+m-1)}{2n-1}Q_{n-2}^m\\ 
+  \iff Q_n^m &= \frac{2n(2n-1)}{n-m}xQ_{n-1}^m - \frac{4n(n-1)(n+m-1)}{n-m}Q_{n-2}^m
+\end{align}
+or 
+\begin{align}\label{eq:downward-recurreence-alpha}
+  P_n^m = \frac{2n(2n-1)}{n-m}x\frac{\alpha_n^m}{\alpha_{n-1}^m}P_{n-1}^m - \frac{4n(n-1)(n+m-1)}{n-m}\frac{\alpha_n^m}{\alpha_{n-2}^m}P_{n-2}^m.
+\end{align}
+Using \eqref{eq:alpha} again, the alpha fractions are
+\begin{align}
+  \frac{\alpha_n^m}{\alpha_{n-1}^m} = \sqrt{\frac{n-m}{n+m}}\frac{1}{2n}
+\end{align}
+and 
+\begin{align}
+  \frac{\alpha_n^m}{\alpha_{n-2}^m} = \sqrt{\frac{(n-m)(n-m-1)}{(n+m)(n+m-1)}}\frac{1}{4n(n-1)}.
+\end{align}
+Back into \eqref{eq:downward-recurreence-alpha}, 
+\begin{align}
+  P_n^m &= \frac{2n(2n-1)}{n-m}x\sqrt{\frac{n-m}{n+m}}\frac{1}{2n}P_{n-1}^m\\ 
+        &- \frac{4n(n-1)(n+m-1)}{n-m}\sqrt{\frac{(n-m)(n-m-1)}{(n+m)(n+m-1)}}\frac{1}{4n(n-1)}P_{n-2}^m. 
+\end{align}
+After some simplification,
+\begin{align}
+  \boxed{P_n^m = \frac{2n-1}{\sqrt{n^2-m^2}}xP_{n-1}^m - \sqrt{\frac{(n-1)^2 - 1}{n^2-m^2}}P_{n-2}^m}
+\end{align}
+% Here we can recognize
 
 % \begin{equation}
 %   i = n - m + \begin{cases}
