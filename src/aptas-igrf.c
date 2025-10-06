@@ -7,8 +7,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define CPP_ASSOC_LEGENDRE_TESTING
-
 #ifdef CPP_ASSOC_LEGENDRE_TESTING
 #include <array>
 #include <cmath>

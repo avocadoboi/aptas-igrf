@@ -1,6 +1,6 @@
 COMPILER_FLAGS := -std=c99 -Wall -Wextra -Iinclude
 CC := gcc
-# COMPILER_FLAGS := -std=c++23 -Wall -Wextra -Iinclude 
+# COMPILER_FLAGS := -DCPP_ASSOC_LEGENDRE_TESTING -std=c++23 -Wall -Wextra -Iinclude 
 # CC := g++
 
 build/test: build/aptas-igrf.o test/test.c | build
