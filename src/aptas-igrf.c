@@ -1,6 +1,9 @@
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#pragma GCC diagnostic ignored "-Wuninitialized"
+
 #include "aptas-igrf.h"
 
-#include "math_constants.h"
+#include "math-constants.h"
 
 #include <assert.h>
 #include <math.h>
