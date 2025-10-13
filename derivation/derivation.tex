@@ -9,15 +9,14 @@
 \begin{document}
 
 \maketitle
-
 \section{Introduction}
-The International Geomagnetic Reference Field (IGRF) is a three-dimensional model of Earth's internally generated magnetic field that is developed by the International Association of Geomagnetism and Aeronomy (IAGA) \parencite{Alken2021}. A new version is released every five years, because the process by which Earth's magnetic field is generated (magnetohydrodynamic dynamo) causes Earth's magnetic field to change over time.
+The International Geomagnetic Reference Field (IGRF) is a three-dimensional model of Earth's internally generated magnetic field that is developed by the International Association of Geomagnetism and Aeronomy (IAGA) \parencite{Alken2021}. A new version is released every five years, because the process by which Earth's magnetic field is generated (magnetohydrodynamic dynamo) causes it to change over time.
 
 In a region of space without currents or electromagnetic waves, the Ampère-Maxwell equation becomes $\nabla\crossproduct\vect{B} = 0$ and the field can be written as the negative gradient of a potential $V$; $\vect{B} = -\nabla V$. The IGRF model provides a list of spherical harmonic coeffients $g_n^m$ and $h_n^m$ which are used in the following equation to calculate the potential:
 \begin{equation}
   V(r, \theta, \phi) = \sum_{n\,=\,0}^N\frac{a^{n+2}}{r^{n+1}}\sum_{m\,=\,0}^n\left(g_n^m\cos(m\phi) + h_n^m\sin(m\phi)\right)P_n^m(\cos\theta).
 \end{equation}
-Here $P_n^m(x)$ is the \textit{Schmidt semi-normalized associated Legendre function} of $n$th degree and $m$th order, $a = \SI{6371.2}{\km}$ is Earth's mean radius, $r$ is the distance from Earth's center to the point the magnetic field is to be calculated at, $\theta$ is its co-latitude, and $\phi$ is its longitude. The coefficients are in reality functions of time. The IGRF provides them at five-year intervals, and between these points they can be estimated via linear interpolation. 
+Here $P_n^m(x)$ is the \textit{Schmidt semi-normalized associated Legendre function} of $n$th degree and $m$th order, $a = \SI{6371.2}{\km}$ is Earth's mean radius, $r$ is the distance from Earth's center to the point the magnetic field is to be calculated at, $\theta$ is its co-latitude, and $\phi$ is its longitude. The coefficients are functions of time, though this parameter has been omitted above. The IGRF provides them at five-year intervals, and between these points they can be estimated via linear interpolation. 
 
 Since we are using spherical coordinates, the magnetic field has the form 
 \begin{equation}
@@ -159,7 +158,7 @@ and since $Q_{n-1}^{m} = D^{n-1+m}(x^2-1)^{n-1}$ and $Q_{n-1}^{m-1}=D^{n-1+m-1}(
 \begin{equation}\label{eq:recurrence-diag-Q}
   Q_n^m = 2nxQ_{n-1}^m + 2n(n+m-1)Q_{n-1}^{m-1}.
 \end{equation}
-Since $Q_n^m=P_n^m/\alpha_n^m$, we can rewrite this as 
+Since $Q_n^m=P_n^m/\alpha_n^m$, this can be rewritten
 \begin{equation}
   P_n^m = 2nx\frac{\alpha_n^m}{\alpha_{n-1}^m}P_{n-1}^m + 2n(n+m-1)\frac{\alpha_n^m}{\alpha_{n-1}^{m-1}}P_{n-1}^{m-1}.
 \end{equation}
@@ -178,7 +177,15 @@ and substituting this back into \eqref{eq:recurrence-diag-P-alpha} results in
 \end{align}
 or, with $x=\cos\theta$,
 \begin{align}
-  \boxed{P_m^m(\cos\theta) = \sqrt{(1+\delta_{m1})\left(1-\frac{1}{2m}\right)}\sin(\theta) P_{m-1}^{m-1}(\cos\theta)}
+  \boxed{P_m^m(\cos\theta) = A_m\sin(\theta) P_{m-1}^{m-1}(\cos\theta)}
+\end{align}
+where 
+\begin{align}
+  \boxed{A_m = \sqrt{(1+\delta_{m1})\left(1-\frac{1}{2m}\right)}}.
+\end{align}
+Differentiating this recurrence relation with respect to $\theta$ gives
+\begin{align}
+  \boxed{\derivative{P_m^m(\cos\theta)}{\theta} = A_m\left(\cos(\theta)P_{m-1}^{m-1}(\cos\theta) + \sin(\theta)\derivative{P_{m-1}^{m-1}(\cos\theta)}{\theta}\right)}.
 \end{align}
 
 \subsubsection{Downwards}
@@ -240,9 +247,17 @@ Back into \eqref{eq:downward-recurreence-alpha},
   P_n^m &= \frac{2n(2n-1)}{n-m}x\sqrt{\frac{n-m}{n+m}}\frac{1}{2n}P_{n-1}^m\\ 
         &- \frac{4n(n-1)(n+m-1)}{n-m}\sqrt{\frac{(n-m)(n-m-1)}{(n+m)(n+m-1)}}\frac{1}{4n(n-1)}P_{n-2}^m. 
 \end{align}
-After some simplification,
+After some simplification and substituting $x = \cos\theta$,
 \begin{align}
-  \boxed{P_n^m = \frac{2n-1}{\sqrt{n^2-m^2}}xP_{n-1}^m - \sqrt{\frac{(n-1)^2 - 1}{n^2-m^2}}P_{n-2}^m}
+  \boxed{P_n^m(\cos\theta) = B_n^m\cos(\theta)P_{n-1}^m(\cos\theta) - C_n^mP_{n-2}^m(\cos\theta)}
+\end{align}
+where 
+\begin{align}
+  \boxed{B_n^m = \frac{2n-1}{\sqrt{n^2-m^2}}\quad\text{and}\quad C_n^m = \sqrt{\frac{(n-1)^2 - 1}{n^2-m^2}}}
+\end{align}
+and the derivative becomes 
+\begin{align}
+  \boxed{\derivative{P_n^m(\cos\theta)}{\theta} = B_n^m\left(\cos(\theta)\derivative{P_{n-1}^m(\cos\theta)}{\theta} - \sin(\theta)P_{n-1}^m(\cos\theta)\right) - C_n^m\derivative{P_{n-2}^m(\cos\theta)}{\theta}}
 \end{align}
 % Here we can recognize
 
