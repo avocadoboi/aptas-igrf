@@ -132,10 +132,15 @@ static associated_legendre_pair_t next_associated_legendre(
   };
 }
 
-magnetic_field_vector_t calculate_model_geomagnetic_field(double const latitude, double longitude, double const altitude, double const decimal_year) {
+magnetic_field_vector_t calculate_model_geomagnetic_field(double latitude, double longitude, double const altitude, double const decimal_year) {
+  // If we are exactly at a pole, decrease the latitude slightly such that
+  // the returned vector is consistent with the given longitude.
+  double const max_latitude = 89.99;
+  latitude = fmin(max_latitude, fmax(-max_latitude, latitude));
+
   longitude *= deg_to_rad;
   // theta is the co-latitude.
-  double const cos_theta = cos((90. - latitude)*deg_to_rad);
+  double const cos_theta = sin(latitude*deg_to_rad);
   double const sin_theta = sqrt(1. - cos_theta*cos_theta);
   double const r = igrf_earth_radius + altitude;
   double const year_factor = decimal_year - 2025.;
@@ -171,10 +176,7 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(double const latitude,
 
       field.up += (n + 1)*radial_factor*(g_nm*cos_mphi + h_nm*sin_mphi)*new_legendre.P_nm;
       field.north += radial_factor*(g_nm*cos_mphi + h_nm*sin_mphi)*new_legendre.P_nm_derivative;
-      // East/west doesn't make sense if we're right at a pole and we get division by 0.
-      if (sin_theta > 1e-8) {
-        field.east += radial_factor*(g_nm*m*sin_mphi - h_nm*m*cos_mphi)*new_legendre.P_nm/sin_theta;
-      }
+      field.east += radial_factor*(g_nm*m*sin_mphi - h_nm*m*cos_mphi)*new_legendre.P_nm/sin_theta;
     }
   }
   
