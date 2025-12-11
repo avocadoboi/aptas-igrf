@@ -22,11 +22,11 @@
 #define H_COEFFICIENT_COUNT N*(N + 1)/2
 
 // Stored column-by column starting from m = 0 with n increasing for each m.
-static double g_coefficients[G_COEFFICIENT_COUNT];
-static double g_coefficients_rate[G_COEFFICIENT_COUNT];
+static float g_coefficients[G_COEFFICIENT_COUNT];
+static float g_coefficients_rate[G_COEFFICIENT_COUNT];
 
-static double h_coefficients[H_COEFFICIENT_COUNT];
-static double h_coefficients_rate[H_COEFFICIENT_COUNT];
+static float h_coefficients[H_COEFFICIENT_COUNT];
+static float h_coefficients_rate[H_COEFFICIENT_COUNT];
 
 IGRFError load_IGRF_coefficients(char const* const file_name) {
   FILE* const file = fopen(file_name, "rt");
@@ -38,19 +38,19 @@ IGRFError load_IGRF_coefficients(char const* const file_name) {
       // See equation (??) in the accompanying PDF.
       int const g_index = n - 1 + m*N - m*(m - 1)/2; // Integer division here is ok, m*(m-1) is always even.
 
-      if (fscanf(file, "%lf%lf", g_coefficients + g_index, g_coefficients_rate + g_index) != 2) {
+      if (fscanf(file, "%f%f", g_coefficients + g_index, g_coefficients_rate + g_index) != 2) {
         fclose(file);
         return IGRFError_UnexpectedFileFormat;
       }
-      // printf("g_%i^%i: %lf %lf\n", n, m, g_coefficients[g_index], g_coefficients_rate[g_index]);
+      // printf("g_%i^%i: %f %f\n", n, m, g_coefficients[g_index], g_coefficients_rate[g_index]);
       if (m != 0) {
         int const h_index = n - 1 - N + m*N - m*(m - 1)/2;
 
-        if (fscanf(file, "%lf%lf", h_coefficients + h_index, h_coefficients_rate + h_index) != 2) {
+        if (fscanf(file, "%f%f", h_coefficients + h_index, h_coefficients_rate + h_index) != 2) {
           fclose(file);
           return IGRFError_UnexpectedFileFormat;
         }
-        // printf("h_%i^%i: %lf %lf\n", n, m, h_coefficients[h_index], h_coefficients_rate[h_index]);
+        // printf("h_%i^%i: %f %f\n", n, m, h_coefficients[h_index], h_coefficients_rate[h_index]);
       }
     }
   }
@@ -58,21 +58,21 @@ IGRFError load_IGRF_coefficients(char const* const file_name) {
 }
 
 typedef struct {
-  double P_up[2];
-  double P_up_derivative[2];
+  float P_up[2];
+  float P_up_derivative[2];
 
-  double P_nn;
-  double P_nn_derivative;
+  float P_nn;
+  float P_nn_derivative;
 } associated_legendre_state_t;
 
 typedef struct {
-  double P_nm;
-  double P_nm_derivative;
+  float P_nm;
+  float P_nm_derivative;
 } associated_legendre_pair_t;
 
 static associated_legendre_pair_t next_associated_legendre(
   unsigned const n, unsigned const m, associated_legendre_state_t* const legendre, 
-  double const cos_theta, double const sin_theta
+  float const cos_theta, float const sin_theta
 ) {
   if (n == 1) {
     if (m == 0) {
@@ -87,7 +87,7 @@ static associated_legendre_pair_t next_associated_legendre(
 
   // Diagonal recurrence
   if (n == m) {
-    double const A = sqrt((n == 1 ? 2 : 1)*(1 - 1./(double)(2*n)));
+    float const A = sqrtf((n == 1 ? 2 : 1)*(1 - 1./(float)(2*n)));
     // P_nn is for saving the value until we get to P_{n+1}^{n+1} after being finished looping through the current column,
     // P_up is for saving the value until we get to the very next index, P_{n+1}^n.
     legendre->P_nn_derivative = A*(sin_theta*legendre->P_nn_derivative + cos_theta*legendre->P_nn);
@@ -101,7 +101,7 @@ static associated_legendre_pair_t next_associated_legendre(
   }
 
   // Otherwise, downwards recurrence
-  double const A = (double)(2*n - 1)/sqrt((double)(n*n - m*m));
+  float const A = (float)(2*n - 1)/sqrtf((float)(n*n - m*m));
 
   // If there is only one (nonzero) P_n^m (i.e. P_{n-1}^m) above the current one 
   if (m == n - 1) {
@@ -116,9 +116,9 @@ static associated_legendre_pair_t next_associated_legendre(
   }
 
   // Otherwise we have to use both P_{n-1}^m and P_{n-2}^m
-  double const B = sqrt((double)((n - 1)*(n - 1) - m*m)/(double)(n*n - m*m));
-  double const P_nm = A*cos_theta*legendre->P_up[0] - B*legendre->P_up[1];
-  double const P_nm_derivative = A*(cos_theta*legendre->P_up_derivative[0] - sin_theta*legendre->P_up[0]) - B*legendre->P_up_derivative[1];
+  float const B = sqrtf((float)((n - 1)*(n - 1) - m*m)/(float)(n*n - m*m));
+  float const P_nm = A*cos_theta*legendre->P_up[0] - B*legendre->P_up[1];
+  float const P_nm_derivative = A*(cos_theta*legendre->P_up_derivative[0] - sin_theta*legendre->P_up[0]) - B*legendre->P_up_derivative[1];
 
   legendre->P_up[1] = legendre->P_up[0];
   legendre->P_up[0] = P_nm;
@@ -132,35 +132,34 @@ static associated_legendre_pair_t next_associated_legendre(
   };
 }
 
-magnetic_field_vector_t calculate_model_geomagnetic_field(double latitude, double longitude, double const altitude, double const decimal_year) {
+magnetic_field_vector_t calculate_model_geomagnetic_field(float latitude, float longitude, float const altitude, float const decimal_year) {
   // If we are exactly at a pole, decrease the latitude slightly such that
   // the returned vector is consistent with the given longitude.
-  double const max_latitude = 89.99;
-  latitude = fmin(max_latitude, fmax(-max_latitude, latitude));
+  float const max_latitude = 89.95;
+  latitude = fminf(max_latitude, fmaxf(-max_latitude, latitude));
 
   longitude *= deg_to_rad;
   // theta is the co-latitude.
-  double const cos_theta = sin(latitude*deg_to_rad);
-  double const sin_theta = sqrt(1. - cos_theta*cos_theta);
-  double const r = igrf_earth_radius + altitude;
-  double const year_factor = decimal_year - 2025.;
+  float const cos_theta = sinf(latitude*deg_to_rad);
+  float const sin_theta = sqrtf(1. - cos_theta*cos_theta);
+  float const r = igrf_earth_radius + altitude;
+  float const year_factor = decimal_year - 2025.;
 
-  // Does not need to be initialized now. 
-  associated_legendre_state_t legendre_state;
+  associated_legendre_state_t legendre_state = {0};
 
   magnetic_field_vector_t field = {0};
   unsigned g_index = 0;
   unsigned h_index = 0;
   for (unsigned m = 0; m <= N; ++m) {
-    double const cos_mphi = cos(m*longitude);
-    double const sin_mphi = sin(m*longitude);
+    float const cos_mphi = cosf(m*longitude);
+    float const sin_mphi = sinf(m*longitude);
     for (unsigned n = m; n <= N; ++n) {
       if (n == 0) continue;
 
-      double const g_nm = g_coefficients[g_index] + year_factor*g_coefficients_rate[g_index];
+      float const g_nm = g_coefficients[g_index] + year_factor*g_coefficients_rate[g_index];
       ++g_index;
 
-      double h_nm = 0.;
+      float h_nm = 0.;
       if (m != 0) {
         h_nm = h_coefficients[h_index] + year_factor*h_coefficients_rate[h_index];
         ++h_index;
@@ -169,10 +168,10 @@ magnetic_field_vector_t calculate_model_geomagnetic_field(double latitude, doubl
       associated_legendre_pair_t const new_legendre = next_associated_legendre(n, m, &legendre_state, cos_theta, sin_theta);
       // Convenient testing using the C++ std::assoc_legendre function. 
 #ifdef CPP_ASSOC_LEGENDRE_TESTING
-      double const correct = std::assoc_legendre(n, m, cos_theta)*std::sqrt((m == 0 ? 1 : 2)*static_cast<double>(std::tgamma(n - m + 1))/static_cast<double>(std::tgamma(n + m + 1)));
+      float const correct = std::assoc_legendre(n, m, cos_theta)*std::sqrtf((m == 0 ? 1 : 2)*static_cast<float>(std::tgamma(n - m + 1))/static_cast<float>(std::tgamma(n + m + 1)));
       printf("n = %u, m = %u; \t%.5g %.5g %.5g\n", n, m, new_legendre.P_nm, correct, new_legendre.P_nm - correct);
 #endif
-      double const radial_factor = pow(igrf_earth_radius/r, n + 2);
+      float const radial_factor = powf(igrf_earth_radius/r, n + 2);
 
       field.up += (n + 1)*radial_factor*(g_nm*cos_mphi + h_nm*sin_mphi)*new_legendre.P_nm;
       field.north += radial_factor*(g_nm*cos_mphi + h_nm*sin_mphi)*new_legendre.P_nm_derivative;
