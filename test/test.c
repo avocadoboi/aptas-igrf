@@ -1,5 +1,4 @@
 #include <aptas-igrf.h>
-#include <geomag70.h>
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -9,14 +8,6 @@
 #define __USE_MISC
 #include <sys/time.h>
 #include <sys/resource.h>
-
-double get_time()
-{
-  struct timeval t;
-  struct timezone tzp;
-  gettimeofday(&t, &tzp);
-  return t.tv_sec + t.tv_usec*1e-6;
-}
 
 static float const equal_epsilon = 0.5;
 
@@ -35,47 +26,6 @@ void load_coefficients(void) {
   default:
     printf("Unknown error code from load_IGRF_coefficients.\n");
     exit(EXIT_FAILURE);
-  }
-  getshc("old-implementation/IGRF14.COF", 13);
-  extrapsh(2025, 2025, 13, 13);
-}
-
-void old_performance(void) {
-  double const time_before = get_time();
-  for (float latitude = -90.; latitude <= 90.; latitude += 90./40) {
-    for (float longitude = 0; longitude < 360.; longitude += 360./40) {
-      for (float altitude = 0; altitude < 800; altitude += 800./40) {
-        float old_field[3] = {0};
-        shval3(latitude, longitude, igrf_earth_radius + altitude, 13, old_field);
-      }
-    }
-  }
-  double const time_after = get_time();
-  printf("Time for old implementation: %.5g s\n", time_after - time_before);
-}
-void new_performance(void) {
-  double const time_before = get_time();
-  for (float latitude = -90.; latitude <= 90.; latitude += 90./40) {
-    for (float longitude = 0; longitude < 360.; longitude += 360./40) {
-      for (float altitude = 0; altitude < 800; altitude += 800./40) {
-        magnetic_field_vector_t const new_field = calculate_model_geomagnetic_field(latitude, longitude, altitude, 2025);
-      }
-    }
-  }
-  double const time_after = get_time();
-  printf("Time for new implementation: %.5g s\n", time_after - time_before);
-}
-
-void compare_new_old(void) {
-  for (float latitude = -90.; latitude <= 90.; latitude += 90./5) {
-    for (float longitude = 0; longitude < 360.; longitude += 360./5) {
-      for (float altitude = 0; altitude < 800; altitude += 800./5) {
-        float old_field[3] = {0};
-        shval3(latitude, longitude, igrf_earth_radius + altitude, 13, old_field);
-        magnetic_field_vector_t const new_field = calculate_model_geomagnetic_field(latitude, longitude, altitude, 2025);
-        printf("new - old: (%.5g, %.5g, %.5g) nT\n", new_field.east - old_field[1], new_field.north + old_field[0], new_field.up - old_field[2]);
-      }
-    }
   }
 }
 
@@ -121,21 +71,6 @@ void check_against_test_set(void) {
 
 int main(void) {
   load_coefficients();
-  old_performance();
-  new_performance();
-  old_performance();
-  new_performance();
-  old_performance();
-  new_performance();
-  old_performance();
-  new_performance();
-  old_performance();
-  new_performance();
-  old_performance();
-  new_performance();
-  old_performance();
-  new_performance();
-  old_performance();
 
   // compare_new_old();
   check_against_test_set();
